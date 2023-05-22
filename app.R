@@ -1,0 +1,94 @@
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
+library(shiny)
+library(shinydashboard)
+library(tidyverse)
+library(DT)
+
+ui <- dashboardPage(
+  dashboardHeader(title='GPTaxonomist'),
+  
+  dashboardSidebar(
+    sidebarMenu(
+      id='sidebar',
+      menuItem('Home', tabName = 'home', icon = icon('home')),
+      menuItem('Parse Description', tabName = 'parse', icon = icon('list')),
+      menuItem('Compare Descriptions', tabName = 'compare', icon = icon('code-compare')),
+      menuItem('Table to description', tabName = 'table', icon = icon('table')),
+      
+      HTML(paste0(
+        "<br>",
+        "<a href='https://www.fieldmuseum.org/about/staff/profile/bruno-de-medeiros' target='_blank'><img style = 'display: block; margin-left: auto; margin-right: auto;' src='Field_Logo_Std_Blue_CMYK.png', width = '186'></a>",
+        "<br>"
+      ))
+      )),
+  
+  dashboardBody(
+    tabItems(
+      tabItem(tabName = "home",
+              h2("Welcome!"),
+              p("This is an interactive tool to help generating useful prompts for doing taxonomic tasks in chatGPT. Check the menu on the left for different tasks.")
+      ),
+      
+      tabItem(tabName = "parse",
+              h2("Parse descriptions"),
+              p("Here we will generate prompts to help parse a taxonomic description in natural language into a table that you can copy and paste in a spreadsheet. This is helpful, for example, to create a morphological character matrix, or to use as a template to describe a new species."),
+              p("On the left panel, provide the description that you want to parse, the language you want it to translate to and a few examples of what you want your table to look like."),
+              p("On the right panel, you will get a generate prompt that you can copy and paste into chatGPT. If your input is too large, we will provide several prompts for you to do it in parts."),
+              fluidRow(
+                box(h3("Input"),
+                    p("Edit text and table below with your data."),
+                    textInput("parseLanguage", 
+                              "Language to output", 
+                              value = read_file("defaults/parse/language.txt")),
+                    textAreaInput("parseDesc", 
+                              "Description to parse",
+                              value = read_file("defaults/parse/description.txt"),
+                              rows = 10),
+                    strong('Examples'),
+                    p('Upload a CSV file to change examples.'),
+                    fileInput('parseExampleTable',NULL),
+                    DTOutput("table1"),
+                    ),
+                box(h3("Results"))
+                )
+      )
+    )
+  )
+)
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+  #initialize reactive values
+  rv = reactiveValues(parseExample = "defaults/parse/example.csv")
+  
+  #change example table if a new table uploaded
+  observeEvent(input$parseExampleTable, 
+               {rv$parseExample = input$parseExampleTable$datapath})
+  observe({
+    rv$dt = datatable(read_csv(rv$parseExample),
+                      filter = 'none',
+                      options = list(dom = 't', ordering=F))    
+  })
+  
+  
+  
+
+
+  
+  output$table1 <- renderDT(rv$dt)
+  
+  
+  
+  
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)

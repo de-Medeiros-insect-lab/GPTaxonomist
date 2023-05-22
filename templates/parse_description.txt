@@ -1,0 +1,20 @@
+Given the following taxonomic description in ${LANGUAGE}, extract a list of characters and their states.  The list must contain all characters in the description, with no exceptions. Correct typos if you see one.
+
+As output, I want a table with one character per row. That means that each row contains a single property of a given structure. Each character will be formatted as follows:
+
+Column 1: character name, with the following format: [major body area], [specific body area], [more specific body area, if any], [property] ([units, if any])
+
+Column 2: observed character state
+
+For body areas, use the first word in each paragraph to deduct the major body area. If you observe a typo, correct it.
+
+```
+${DESCRIPTION}
+```
+
+Here go a few examples of the kind of output I want, but your output should not include the example. Include every single character in the same order they are listed in the original description.
+
+```
+${EXAMPLE}
+```
+After you finish, explicitly say you are done.
