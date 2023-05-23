@@ -16,7 +16,7 @@ If you observe a typo, correct it.
 ${DESCRIPTION}
 ```
 
-Here go a few examples of the kind expected. Your output should not include the example. Include every single character in the same order they are listed in the original description. Do not include any characters absent in the description.
+Here go a few examples of the output expected. Your output should not include the example. Include every single character in the same order they are listed in the original description. Do not include any characters absent in the description.
 
 ```
 ${EXAMPLE}

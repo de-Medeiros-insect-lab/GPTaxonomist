@@ -21,9 +21,9 @@ fill_parseDescription = function(description, language, example){
   template = read_file('templates/parse_description.txt')
   
   return(template %>%
-           str_replace('\\$\\{DESCRIPTION\\}', description) %>%
-           str_replace('\\$\\{LANGUAGE\\}', language) %>%
-           str_replace('\\$\\{EXAMPLE\\}', example)
+           str_replace_all('\\$\\{DESCRIPTION\\}', description) %>%
+           str_replace_all('\\$\\{LANGUAGE\\}', language) %>%
+           str_replace_all('\\$\\{EXAMPLE\\}', example)
            ) 
 }
 

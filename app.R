@@ -9,6 +9,7 @@
 
 library(shiny)
 library(shinydashboard)
+library(rclipboard)
 library(tidyverse)
 library(DT)
 
@@ -18,6 +19,7 @@ ui <- dashboardPage(
   dashboardSidebar(
     sidebarMenu(
       id='sidebar',
+      rclipboardSetup(),
       menuItem('Home', tabName = 'home', icon = icon('home')),
       menuItem('Parse Description', tabName = 'parse', icon = icon('list')),
       menuItem('Compare Descriptions', tabName = 'compare', icon = icon('code-compare')),
@@ -54,36 +56,94 @@ ui <- dashboardPage(
                               rows = 10),
                     strong('Examples'),
                     p('Upload a CSV file to change examples.'),
-                    fileInput('parseExampleTable',NULL),
+                    fileInput('parseExampleFile',NULL,accept = '.csv'),
                     DTOutput("table1"),
                     ),
-                box(h3("Results"))
+                box(h3("Results"),
+                    uiOutput("parseOutputTabs")
+                    )
                 )
       )
     )
   )
 )
 
-# Define server logic required to draw a histogram
+# Server computations
 server <- function(input, output) {
-  #initialize reactive values
-  rv = reactiveValues(parseExample = "defaults/parse/example.csv")
+  #read functions
+  source('code/parse_functions.R')
   
+  #initialize reactive values
+  rv = reactiveValues(parseExamplePath = "defaults/parse/example.csv")
+  
+  ############DESCRIPTION parsing
+  
+  ### Reactive input handling
   #change example table if a new table uploaded
-  observeEvent(input$parseExampleTable, 
-               {rv$parseExample = input$parseExampleTable$datapath})
+  observeEvent(input$parseExampleFile, 
+               {rv$parseExamplePath = input$parseExampleFile$datapath
+               })
+  
+  #update parsed example table
   observe({
-    rv$dt = datatable(read_csv(rv$parseExample),
-                      filter = 'none',
-                      options = list(dom = 't', ordering=F))    
+    rv$parseExampleDF = read_csv(rv$parseExamplePath)
+    rv$parseExampleDT = datatable(rv$parseExampleDF,
+                                  filter = 'none',
+                                  options = list(dom = 't', ordering=F))   
+  })
+  
+  #update table in UI
+  observe({
+    output$table1 = renderDT(datatable(read_csv(rv$parseExamplePath),
+                                       filter = 'none',
+                                       options = list(dom = 't', ordering=F))   )
+    
+  })
+  
+  
+  ### Generating output
+  #process parsing input and produce text blocks
+  observe({
+    rv$parseParagraphs = group_paragraphs(input$parseDesc) 
+    
+    rv$parseOutputPrompts = purrr::map(rv$parseParagraphs,
+                                    ~fill_parseDescription(.x,
+                                                           input$parseLanguage,
+                                                           knitr::kable(rv$parseExampleDF, format = 'pipe', escape = FALSE) %>% 
+                                                             paste0(collapse='\n')
+                                                           )
+                                    )
+  })
+  
+  observe({
+    for (i in length(rv$parseOutputPrompts)){
+      output[[str_c('parseOutputPrompt',i,sep='')]] = renderText(rv$parseOutputPrompts[[i]])
+    }
+  })
+  
+  observe({
+    rv$parseOutputTabs = purrr::map(1:length(rv$parseOutputPrompts),
+    ~tabPanel(title = str_c('Prompt',.x,sep=''),
+              verbatimTextOutput(str_c('parseOutputPrompt',.x,sep='')
+                                 )
+              )
+    )
+  })
+  
+  
+  observe({
+    output$parseOutputTabs = renderUI({
+      do.call(navlistPanel,rv$parseOutputTabs)
+    })
+    
   })
   
   
   
 
 
+  #outputs
   
-  output$table1 <- renderDT(rv$dt)
   
   
   
