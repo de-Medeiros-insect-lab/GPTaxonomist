@@ -1,18 +1,22 @@
-Given the following taxonomic description in ${LANGUAGE}, extract a list of characters and their states.  The list must contain all characters in the description, with no exceptions. Correct typos if you see one.
+Given the following taxonomic description, extract a list of characters and their states. If the original language is not ${LANGUAGE}, translate to ${LANGUAGE}. Otherwise, do not attempt any translation. The list must contain all characters in the description, with no exceptions. Correct typos if you see one.
 
-As output, I want a table with one character per row. That means that each row contains a single property of a given structure. Each character will be formatted as follows:
+As output, produce a table with one character per row. Each row contains a single property of a given structure. Split properties for the same structure in separate rows if needed. Example properties are shape, color, aspect, position, vestiture, punctuation, setation, but there are others. Each character will be formatted as follows:
 
-Column 1: character name, with the following format: [major body area], [specific body area], [more specific body area, if any], [property] ([units, if any])
+Column 1: character name, with the following format: [semaphoront], [major body area], [specific body area], [more specific body area, if any], [property] ([units, if any])
 
-Column 2: observed character state
+Column 2: observed state
 
-For body areas, use the first word in each paragraph to deduct the major body area. If you observe a typo, correct it.
+Semaphoronts are sexes or life stages.
+
+In typical taxonomic descriptions, paragraphs usually group major a body area. Specific body areas are grouped by sentence, and more specific body areas are separated by semicolons within sentences. This structure may vary, so be flexible and use logic.
+
+If you observe a typo, correct it.
 
 ```
 ${DESCRIPTION}
 ```
 
-Here go a few examples of the kind of output I want, but your output should not include the example. Include every single character in the same order they are listed in the original description.
+Here go a few examples of the kind expected. Your output should not include the example. Include every single character in the same order they are listed in the original description. Do not include any characters absent in the description.
 
 ```
 ${EXAMPLE}

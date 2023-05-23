@@ -16,5 +16,14 @@ group_paragraphs = function(input){
   
 }
 
-#returns group ids for pa
+#fills up description parsing template
+fill_parseDescription = function(description, language, example){
+  template = read_file('templates/parse_description.txt')
+  
+  return(template %>%
+           str_replace('\\$\\{DESCRIPTION\\}', description) %>%
+           str_replace('\\$\\{LANGUAGE\\}', language) %>%
+           str_replace('\\$\\{EXAMPLE\\}', example)
+           ) 
+}
 
