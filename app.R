@@ -1,6 +1,6 @@
 #
 # This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
+# the "Run App" button above.
 #
 # Find out more about building applications with Shiny here:
 #
@@ -14,20 +14,20 @@ library(tidyverse)
 library(DT)
 
 ui <- dashboardPage(
-  dashboardHeader(title='GPTaxonomist'),
+  dashboardHeader(title="GPTaxonomist"),
   
   dashboardSidebar(
     sidebarMenu(
-      id='sidebar',
+      id="sidebar",
       rclipboardSetup(),
-      menuItem('Home', tabName = 'home', icon = icon('home')),
-      menuItem('Parse Description', tabName = 'parse', icon = icon('list')),
-      menuItem('Compare Descriptions', tabName = 'compare', icon = icon('code-compare')),
-      menuItem('Table to description', tabName = 'table', icon = icon('table')),
+      menuItem("Home", tabName = "home", icon = icon("home")),
+      menuItem("Parse Description", tabName = "parse", icon = icon("list")),
+      menuItem("Compare Descriptions", tabName = "compare", icon = icon("code-compare")),
+      menuItem("Table to description", tabName = "table", icon = icon("table")),
       
       HTML(paste0(
         "<br>",
-        "<a href='https://www.fieldmuseum.org/about/staff/profile/bruno-de-medeiros' target='_blank'><img style = 'display: block; margin-left: auto; margin-right: auto;' src='Field_Logo_Std_Blue_CMYK.png', width = '186'></a>",
+        '<a href="https://www.fieldmuseum.org/about/staff/profile/bruno-de-medeiros" target="_blank"><img style = "display: block; margin-left: auto; margin-right: auto;" src="Field_Logo_Std_Blue_CMYK.png", width = "186"></a>',
         "<br>"
       ))
       )),
@@ -42,10 +42,10 @@ ui <- dashboardPage(
       tabItem(tabName = "parse",
               h2("Parse descriptions"),
               p("Here we will generate prompts to help parse a taxonomic description in natural language into a table that you can copy and paste in a spreadsheet. This is helpful, for example, to create a morphological character matrix, or to use as a template to describe a new species."),
-              p("On the left panel, provide the description that you want to parse, the language you want it to translate to and a few examples of what you want your table to look like."),
-              p("On the right panel, you will get a generate prompt that you can copy and paste into chatGPT. If your input is too large, we will provide several prompts for you to do it in parts."),
-              fluidRow(
-                box(h3("Input"),
+              p("On the Input tab , provide the description that you want to parse, the language you want it to translate to and a few examples of what you want your table to look like."),
+              p("On the Results panel, you get a prompt that you can copy and paste into chatGPT. If your input is too large, we will provide several prompts for you to do it in parts."),
+              tabsetPanel(type = "tabs",
+                          tabPanel("Input",
                     p("Edit text and table below with your data."),
                     textInput("parseLanguage", 
                               "Language to output", 
@@ -53,25 +53,27 @@ ui <- dashboardPage(
                     textAreaInput("parseDesc", 
                               "Description to parse",
                               value = read_file("defaults/parse/description.txt"),
-                              rows = 10),
-                    strong('Examples'),
-                    p('Upload a CSV file to change examples.'),
-                    fileInput('parseExampleFile',NULL,accept = '.csv'),
+                              rows = 10,
+                              width = "100%" ),
+                    strong("Examples"),
+                    p("Upload a CSV file to change examples."),
+                    fileInput("parseExampleFile",NULL,accept = ".csv",buttonLabel = "Upload csv..."),
                     DTOutput("table1"),
                     ),
-                box(h3("Results"),
+              tabPanel("Results",
+                       p("Navigate the tabs below to see the prompts generated. Copy and paste them in chatGPT to get the desired result. If GPT response is too long and the response get cut in the middle, use the following to continue:"),
+                       strong("Continue from the last incomplete row, repeat table headers."),
                     uiOutput("parseOutputTabs")
                     )
                 )
       )
     )
-  )
-)
+  ))
 
 # Server computations
 server <- function(input, output) {
   #read functions
-  source('code/parse_functions.R')
+  source("code/parse_functions.R")
   
   #initialize reactive values
   rv = reactiveValues(parseExamplePath = "defaults/parse/example.csv")
@@ -88,15 +90,15 @@ server <- function(input, output) {
   observe({
     rv$parseExampleDF = read_csv(rv$parseExamplePath)
     rv$parseExampleDT = datatable(rv$parseExampleDF,
-                                  filter = 'none',
-                                  options = list(dom = 't', ordering=F))   
+                                  filter = "none",
+                                  options = list(dom = "t", ordering=F))   
   })
   
   #update table in UI
   observe({
     output$table1 = renderDT(datatable(read_csv(rv$parseExamplePath),
-                                       filter = 'none',
-                                       options = list(dom = 't', ordering=F))   )
+                                       filter = "none",
+                                       options = list(dom = "t", ordering=F))   )
     
   })
   
@@ -109,28 +111,37 @@ server <- function(input, output) {
     rv$parseOutputPrompts = purrr::map(rv$parseParagraphs,
                                     ~fill_parseDescription(.x,
                                                            input$parseLanguage,
-                                                           knitr::kable(rv$parseExampleDF, format = 'pipe', escape = FALSE) %>% 
-                                                             paste0(collapse='\n')
+                                                           knitr::kable(rv$parseExampleDF, format = "pipe", escape = FALSE) %>% 
+                                                             paste0(collapse="\n")
                                                            )
                                     )
   })
   
   observe({
-    for (i in length(rv$parseOutputPrompts)){
-      output[[str_c('parseOutputPrompt',i,sep='')]] = renderText(rv$parseOutputPrompts[[i]])
-    }
+    lapply(1:length(rv$parseOutputPrompts), function(i) {
+      local({
+        local_i <- i
+        output[[str_c("parseOutputPrompt", local_i, sep="")]] <- renderText({
+          rv$parseOutputPrompts[[local_i]]
+        })
+      })
+    })
   })
   
+  
   observe({
-    rv$parseOutputTabs = purrr::map(1:length(rv$parseOutputPrompts),
-    ~tabPanel(title = str_c('Prompt',.x,sep=''),
-              verbatimTextOutput(str_c('parseOutputPrompt',.x,sep='')
-                                 )
+    rv$parseOutputTabs = lapply(1:length(rv$parseOutputPrompts),
+    function(.x) tabPanel(title = str_c("Prompt",.x,sep=" "),
+              value = str_c("Prompt",.x,sep=""),
+              rclipButton(str_c("parseOutputClip",.x,sep=""),
+                          "Copy to clipboard",
+                          rv$parseOutputPrompts[[.x]]),
+              verbatimTextOutput(str_c("parseOutputPrompt",.x,sep=""))
               )
     )
   })
   
-  
+  #dynamically create tab outputs
   observe({
     output$parseOutputTabs = renderUI({
       do.call(navlistPanel,rv$parseOutputTabs)
