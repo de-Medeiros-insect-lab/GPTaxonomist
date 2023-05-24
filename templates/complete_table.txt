@@ -1,0 +1,20 @@
+Given the following table listing characters and their states for one species, use the provided natural language species description to add a column to the table with the observed states for the species in the description.
+
+Only add the characters already present in the table, and ignore characters present in the description but not the table. If the terminology is not exactly equal in both sources, use terminology from the table, not the description. If a character is missing in the description, complete the table with `NA`
+
+If the original language is not ${LANGUAGE}, translate the results to ${LANGUAGE}. Otherwise, do not attempt any translation. 
+
+As output, produce a table in which columns 1 and 2 are identical to the table provided. Column 3 should be named with the name of the species in the description and should list the observed states in the description.
+
+Only include characters already present in the table,do not add new rows to the table.
+
+Description to parse:
+```
+${DESCRIPTION}
+```
+
+Table to add to:
+```
+${TABLE}
+```
+After you finish, explicitly say you are done.

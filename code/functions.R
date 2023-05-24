@@ -27,3 +27,33 @@ fill_parseDescription = function(description, language, example){
            ) 
 }
 
+#returns paragraphs in groups containing at most 500 words
+group_table_rows = function(input_table){
+  
+  word_counts = input_table %>%
+    rowwise() %>%
+    mutate(total_words = sum(str_count(c_across(everything()), "\\S+"))) %>%
+    ungroup() %>%
+    mutate(cum_words = cumsum(total_words),
+           groups = floor(cum_words/300) + 1)
+  
+  out_tables = split(word_counts,word_counts$groups)
+  
+  return(out_tables)
+  
+}
+
+#fills up complete table template
+fill_completeTable = function(description, language, table1){
+  template = read_file('templates/complete_table.txt')
+  out_table_text = knitr::kable(table1, format = "pipe", escape = FALSE) %>%
+    str_c(collapse = '\n')
+  
+  
+  return(template %>%
+           str_replace_all('\\$\\{DESCRIPTION\\}', description) %>%
+           str_replace_all('\\$\\{LANGUAGE\\}', language) %>%
+           str_replace_all('\\$\\{TABLE\\}', out_table_text)
+  ) 
+}
+
