@@ -4,9 +4,12 @@ parse_paragraph_word_limit = 500
 
 #format a markdown table
 format_table = function(df){
-  knitr::kable(df, format = "pipe", escape = FALSE) %>%
+  f_table = knitr::kable(df, format = "pipe", escape = FALSE) %>%
     str_replace_all("\\|"," \\| ") %>%
-    str_replace_all(" +", " ") %>%
+    str_trim() %>%
+    str_replace_all(" +", " ") 
+  f_table[2] = str_replace_all(f_table[2],"[:-]+",":-")
+  f_table %>%
     paste0(collapse ="\n")
 }
 

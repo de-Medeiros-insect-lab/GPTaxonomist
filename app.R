@@ -64,12 +64,23 @@ ui <- dashboardPage(
   ),
   
   dashboardBody(
+    tags$head(
+      tags$style(
+        HTML("
+        .my-margin {
+          margin-left: 10px;
+        }
+      ")
+      )),
     tabItems(
       tabItem(
         tabName = "home",
         h2("Welcome!"),
         p(
-          "This is an interactive tool to help generating useful prompts for doing taxonomic tasks in chatGPT. Check the menu on the left for different tasks."
+          "This is an interactive tool to help generating useful prompts for doing taxonomic tasks using large language models such as chatGPT and Bard. Check the menu on the left for different tasks."
+        ),
+        p(
+          "All tasks include default values as examples, change them to use your own data as input."
         )
       ),
       
@@ -79,15 +90,18 @@ ui <- dashboardPage(
       tabItem(
         tabName = "parse",
         h2("Parse descriptions"),
-        p(
-          "Here we will generate prompts to help parse a taxonomic description in natural language into a table that you can copy and paste in a spreadsheet. This is helpful, for example, to create a morphological character matrix, or to use as a template to describe a new species."
-        ),
-        p(
-          "On the Input tab , provide the description that you want to parse, the language you want it to translate to and a few examples of what you want your table to look like."
-        ),
-        p(
-          "On the Results panel, you get a prompt that you can copy and paste into chatGPT. If your input is too large, we will provide several prompts for you to do it in parts."
-        ),
+        h3("Purpose"),
+        p("Generate a prompt to parse a taxonomic description in natural language into a table that can be copied and pasted"),
+        h3("Input required"),
+        tags$div(
+          tags$ul(
+            tags$li(tags$b("The output language desired.")," Edit the text box below to change."),
+            tags$li(tags$b("The description to parse.")," Edit the text box below to change."),
+            tags$li(tags$b("A table with examples.")," only use 5-10 examples. Create a table, export it in CSV format and upload it here using the button below.")
+          )
+          ),
+
+        
         tabsetPanel(
           type = "tabs",
           tabPanel(
@@ -117,11 +131,13 @@ ui <- dashboardPage(
           ),
           tabPanel(
             "Results",
-            p("If your input description was too long, we automatically split it in smaller chuncks by paragraph so it is possible to use chatGPT."),
+            p("If your input description was too long, we automatically split it in smaller chuncks by paragraph so it is possible to use chatGPT or Bard."),
             p(
-              "Navigate the tabs below to see the prompts generated. Copy and paste them in chatGPT to get the desired result. If GPT response is too long and the response get cut in the middle, use the following to continue:"
+              "Navigate the tabs below to see the prompts generated. 
+                              Copy and paste them in chatGPT or Bard to get the desired result. 
+                              If GPT response is too long and the response get cut in the middle, use the following to continue:",
+              tags$i("Continue from the last incomplete row, repeat table headers.")
             ),
-            strong("Continue from the last incomplete row, repeat table headers."),
             uiOutput("parseOutputTabs")
           )
         )
@@ -133,9 +149,16 @@ ui <- dashboardPage(
       tabItem(
         tabName = "complete",
         h2("Complete table"),
-        p(
-          "The goal here is to combine a natural language description and a table of characters."
-        ),
+        h3("Purpose"),
+        p("To generate a prompt to parse a taxonomic description in natural language and add characters to a pre-made table."),
+        h3("Input required"),
+        tags$div(
+          tags$ul(
+            tags$li(tags$b("The output language desired."), " Edit the text box below to change."),
+            tags$li(tags$b("The description to parse.")," Edit the text box below to change."),
+            tags$li(tags$b("A table to be filled out.")," This must include 2 columns: one with character names and another with observed states for an example species. The second column may be blank, but it will work better if not. Create a table, export it in CSV format and upload it here using the button below.")
+          )
+          ),
         tabsetPanel(type = "tabs",
                     tabPanel("Input",
                              textInput(
@@ -145,7 +168,7 @@ ui <- dashboardPage(
                              ),
                              textAreaInput(
                                "completeDesc",
-                               "Description to read",
+                               "Description to parse",
                                value = read_file("defaults/complete/description.txt"),
                                rows = 10,
                                width = "100%"
@@ -161,11 +184,13 @@ ui <- dashboardPage(
                              DTOutput("completeTable1")
                              ),
                     tabPanel("Result",
-                             p("If your input table was too long, we automatically split it in smaller tables so it is possible to use chatGPT."),
+                             p("If your input table was too long, we automatically split it in smaller tables so it is possible to use chatGPT or Bard."),
                              p(
-                              "Navigate the tabs below to see the prompts generated. Copy and paste them in chatGPT to get the desired result. If GPT response is too long and the response get cut in the middle, use the following to continue:"
+                              "Navigate the tabs below to see the prompts generated. 
+                              Copy and paste them in chatGPT or Bard to get the desired result. 
+                              If GPT response is too long and the response get cut in the middle, use the following to continue:",
+                              tags$i("Continue from the last incomplete row, repeat table headers.")
                              ),
-                             strong("Continue from the last incomplete row, repeat table headers."),
                              uiOutput("completeOutputTabs")
                              ))
       ),
@@ -221,6 +246,10 @@ server <- function(input, output) {
   rv = reactiveValues(parseExamplePath = "defaults/parse/example.csv",
                       completeTablePath = "defaults/complete/table.csv"
                       )
+  
+  chatGPTlink = a("Go to chatGPT", href = "https://chat.openai.com", target = "_blank", class="btn btn-primary")
+  bardlink = a("Go to Google Bard", href = "https://bard.google.com", target = "_blank", class="btn btn-primary")
+  
   
   ######################## PARSE server-side ###########################
   ### Reactive input handling
@@ -280,14 +309,18 @@ server <- function(input, output) {
                                   tabPanel(
                                     title = str_c("Prompt", .x, sep = " "),
                                     value = str_c("Prompt", .x, sep = ""),
-                                    rclipButton(
-                                      str_c("parseOutputClip", .x, sep = ""),
-                                      "Copy to clipboard",
-                                      rv$parseOutputPrompts[[.x]]
+                                    fluidRow(
+                                      class = "my-margin",
+                                      rclipButton(
+                                        str_c("parseOutputClip", .x, sep = ""),
+                                        "Copy to clipboard",
+                                        rv$parseOutputPrompts[[.x]]
+                                        ),
+                                      chatGPTlink,
+                                      bardlink
                                     ),
-                                    verbatimTextOutput(str_c("parseOutputPrompt", .x, sep = "")),
-                                    a("Go to chatGPT", href = "https://chat.openai.com", target =
-                                        "_blank")
+                                    fluidRow(class = "my-margin",
+                                             verbatimTextOutput(str_c("parseOutputPrompt", .x, sep = ""))),
                                   ))
   })
   #join output tabs
@@ -344,20 +377,25 @@ server <- function(input, output) {
   #dynamically create output tabs
   observe({
     rv$completeOutputTabs = lapply(1:length(rv$completeOutputPrompts),
-                                function(.x)
-                                  tabPanel(
-                                    title = str_c("Prompt", .x, sep = " "),
-                                    value = str_c("Prompt", .x, sep = ""),
-                                    rclipButton(
-                                      str_c("completeOutputClip", .x, sep = ""),
-                                      "Copy to clipboard",
-                                      rv$completeOutputPrompts[[.x]]
-                                    ),
-                                    verbatimTextOutput(str_c("completeOutputPrompt", .x, sep = "")),
-                                    a("Go to chatGPT", href = "https://chat.openai.com", target =
-                                        "_blank")
-                                  ))
-    print("a")
+                                   function(.x)
+                                     tabPanel(
+                                       title = str_c("Prompt", .x, sep = " "),
+                                       value = str_c("Prompt", .x, sep = ""),
+                                       fluidRow(
+                                         class = "my-margin",
+                                         rclipButton(
+                                           str_c("completeOutputClip", .x, sep = ""),
+                                           "Copy to clipboard",
+                                           rv$completeOutputPrompts[[.x]]
+                                         ),
+                                         chatGPTlink,
+                                         bardlink
+                                       ),
+                                       fluidRow(class = "my-margin",
+                                                verbatimTextOutput(str_c("completeOutputPrompt", .x, sep = ""))
+                                       )
+                                       
+                                     ))
   })
   #join output tabs
   observe({

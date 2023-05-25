@@ -17,4 +17,4 @@ Table to add to:
 ```
 ${TABLE}
 ```
-After you finish, explicitly say you are done. Translate the response to ${LANGUAGE} if this is not the original language. Include only table in response, do not prepend anything to table.
+Translate the response to ${LANGUAGE} if this is not the original language. Start the response with output table. Do not prepend anything to table in any circumstance. Format the table properly for easy copying from here to paste in Excel. After you finish, explicitly say you are done.
