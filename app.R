@@ -257,9 +257,7 @@ server <- function(input, output) {
       ~ fill_parseDescription(
         .x,
         input$parseLanguage,
-        knitr::kable(rv$parseExampleDF, format = "pipe", escape = FALSE) %>%
-          paste0(collapse =
-                   "\n")
+        format_table(rv$parseExampleDF)
       )
     )
   })

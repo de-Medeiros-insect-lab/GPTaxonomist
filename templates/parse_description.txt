@@ -1,4 +1,4 @@
-Given the following taxonomic description, extract a list of characters and their states. If the original language is not ${LANGUAGE}, translate to ${LANGUAGE}. Otherwise, do not attempt any translation. The list must contain all characters in the description, with no exceptions. Correct typos if you see one.
+Given the following taxonomic description, extract a list of characters and their states. The list must contain all characters in the description, with no exceptions. Correct typos if you see one.
 
 As output, produce a table with one character per row. Each row contains a single property of a given structure. Split properties for the same structure in separate rows if needed. Example properties are shape, color, aspect, position, vestiture, punctuation, setation, but there are others. Each character will be formatted as follows:
 
@@ -21,4 +21,4 @@ Here go a few examples of the output expected. Your output should not include th
 ```
 ${EXAMPLE}
 ```
-After you finish, explicitly say you are done.
+After you finish, explicitly say you are done. Translate the response to ${LANGUAGE} if this is not the original language. Only include table in response, do not prepend anything
