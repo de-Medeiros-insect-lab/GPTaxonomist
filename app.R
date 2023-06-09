@@ -195,13 +195,53 @@ ui <- dashboardPage(
                              ))
       ),
       
+      
+      ###################################### COMPARE UI ####################################
       tabItem(
         tabName = "compare",
         h2("Compare descriptions"),
-        p("Lorem ipsum."),
+        h3("Purpose"),
+        p("Compare to taxonomic descriptions, potentially in different languages"),
+        h3("Input required"),
+        tags$div(
+          tags$ul(
+            tags$li(tags$b("The output language desired.")," Edit the text box below to change."),
+            tags$li(tags$b("Description 1.")," Edit the text box below to change."),
+            tags$li(tags$b("Description 2.")," Edit the text box below to change.")
+          )
+        ),
         tabsetPanel(type = "tabs",
-                    tabPanel("Input"),
-                    tabPanel("Result"))
+                    tabPanel("Input",
+                             textInput(
+                               "compareLanguage",
+                               "Language to output",
+                               value = read_file("defaults/compare/language.txt")
+                             ),
+                             checkboxInput(
+                               "compareSelectExclude",
+                               "Only include characters observed in both descriptions"
+                             ),
+                             textAreaInput(
+                               "compareDesc1",
+                               "Description 1",
+                               value = read_file("defaults/compare/description1.txt"),
+                               rows = 10,
+                               width = "100%"
+                             ),
+                             textAreaInput(
+                               "compareDesc2",
+                               "Description 2",
+                               value = read_file("defaults/compare/description2.txt"),
+                               rows = 10,
+                               width = "100%"
+                             )
+                    ),
+                    tabPanel("Result",
+                             p("Use the prompt below to compare the descriptions and get a table."),
+                             uiOutput("compareOutputUI")
+                    )
+        )
+        
       ),
       tabItem(
         tabName = "table",
@@ -228,14 +268,14 @@ ui <- dashboardPage(
                     tabPanel("Result"))
       )
       
+    )))
       
       
       
       
-      
-    )
-  )
-)
+    
+  
+
 
 # Server computations
 server <- function(input, output) {
@@ -404,6 +444,37 @@ server <- function(input, output) {
     })
   })
   
+  
+  
+  
+  ######################## COMPARE server-side ###########################
+  observe({
+    
+    rv$compareOutputPrompt = fill_compareDescriptions(
+      description1 = input$compareDesc1,
+      description2 = input$compareDesc2,
+      language = input$compareLanguage,
+      exclude_unique = input$compareSelectExclude
+    )
+    output$compareOutputPrompt = renderText(rv$compareOutputPrompt)
+    output$compareOutputUI = renderUI({
+      fluidPage(
+        fluidRow("This function does not check input size. If your prompt is too long, consider reducing the input descriptions. For example, by comparing paragraphs instead of whole descriptions."),
+        fluidRow(
+          rclipButton(
+          "compareOutputClip",
+          "Copy to clipboard",
+          rv$compareOutputPrompt
+          ),
+        chatGPTlink,
+        bardlink
+      ),
+      fluidRow(verbatimTextOutput("compareOutputPrompt"))
+      )
+    }
+    )
+    
+  })
   
   
   

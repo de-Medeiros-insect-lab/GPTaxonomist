@@ -32,7 +32,7 @@ group_paragraphs = function(input, word_limit = parse_paragraph_word_limit){
   
 }
 
-#fills up description parsing template
+#fills up PARSE DESCRIPTION template
 fill_parseDescription = function(description, language, example){
   template = read_file('templates/parse_description.txt')
   
@@ -43,7 +43,7 @@ fill_parseDescription = function(description, language, example){
            ) 
 }
 
-#returns paragraphs in groups containing at most 500 words
+#returns table rows in groups containing at most complete_table_word_limit
 group_table_rows = function(input_table, word_limit = complete_table_word_limit){
   
   word_counts = input_table %>%
@@ -59,7 +59,7 @@ group_table_rows = function(input_table, word_limit = complete_table_word_limit)
   
 }
 
-#fills up complete table template
+#fills up COMPLETE TABLE template
 fill_completeTable = function(description, language, table1){
   template = read_file('templates/complete_table.txt')
   out_table_text = format_table(table1)
@@ -69,6 +69,24 @@ fill_completeTable = function(description, language, table1){
            str_replace_all('\\$\\{DESCRIPTION\\}', description) %>%
            str_replace_all('\\$\\{LANGUAGE\\}', language) %>%
            str_replace_all('\\$\\{TABLE\\}', out_table_text)
+  ) 
+}
+
+#fills up a COMPARE DESCRIPTIONS template
+fill_compareDescriptions = function(description1, description2, language, exclude_unique){
+  template = read_file('templates/compare_description.txt')
+  
+  if (exclude_unique){
+    unique_statement = "Only include characters observed in both species. "
+  } else {
+    unique_statement = "Include all characters, fill up with NA if not observed for a species. "
+  }
+  
+  return(template %>%
+           str_replace_all('\\$\\{DESCRIPTION1\\}', description1) %>%
+           str_replace_all('\\$\\{DESCRIPTION2\\}', description2) %>%
+           str_replace_all('\\$\\{LANGUAGE\\}', language) %>%
+           str_replace_all('\\$\\{INCLUDE_STATEMENT\\}', unique_statement)
   ) 
 }
 
