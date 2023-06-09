@@ -1,0 +1,23 @@
+You are a taxonomist. Given the following table describing the characters for a species, produce a natural-language publication-quality taxonomic description
+
+Table:
+```
+${CHARACTER_TABLE}
+```
+
+The resulting description must be consistent with the description of similar taxa. Here I provide the description of this other taxon as a template.
+
+Template:
+```
+${TEMPLATE_DESCRIPTION}
+```
+
+The result should strictly follow these rules:
+- publication-quality description
+- telegraphic language
+- if a character state is not observed in the table, skip this character, do not mention it. Do not say it was not observed, just ignore it.
+- if a character exists in the table but not the template, ignore it in the output description but raise a warning at the end.
+- character names and order must follow the template, except for those not observed in the table.
+- punctuation and line breaks must follow the template, skipping characters not observed in the table.
+- observed states must follow the table, NOT the template. Never use observed states from the template.
+- output language must be ${LANGUAGE}. Translate if needed.

@@ -90,3 +90,16 @@ fill_compareDescriptions = function(description1, description2, language, exclud
   ) 
 }
 
+
+#fills up a WRITE DESCRIPTION template
+fill_writeDescription = function(character_table, template_description, language){
+  template = read_file('templates/write_description.txt')
+  formatted_table = format_table(character_table)
+  
+    return(template %>%
+           str_replace_all('\\$\\{TEMPLATE_DESCRIPTION\\}', template_description) %>%
+           str_replace_all('\\$\\{CHARACTER_TABLE\\}', formatted_table) %>%
+           str_replace_all('\\$\\{LANGUAGE\\}', language) 
+  ) 
+}
+

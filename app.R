@@ -110,7 +110,7 @@ ui <- dashboardPage(
             textInput(
               "parseLanguage",
               "Language to output",
-              value = read_file("defaults/parse/language.txt")
+              value = read_file("defaults/language.txt")
             ),
             textAreaInput(
               "parseDesc",
@@ -164,7 +164,7 @@ ui <- dashboardPage(
                              textInput(
                                "completeLanguage",
                                "Language to output",
-                               value = read_file("defaults/complete/language.txt")
+                               value = read_file("defaults/language.txt")
                              ),
                              textAreaInput(
                                "completeDesc",
@@ -215,7 +215,7 @@ ui <- dashboardPage(
                              textInput(
                                "compareLanguage",
                                "Language to output",
-                               value = read_file("defaults/compare/language.txt")
+                               value = read_file("defaults/language.txt")
                              ),
                              checkboxInput(
                                "compareSelectExclude",
@@ -243,13 +243,49 @@ ui <- dashboardPage(
         )
         
       ),
+      
+      
+      ###################################### WRITE UI ####################################
       tabItem(
         tabName = "table",
-        h2("Produce natural language description from table"),
-        p("Lorem ipsum."),
+        h2("Natural language description"),
+        h3("Purpose"),
+        p("Given input characters and their states in table format, write them out as a natural-language description. This description follows the template provided."),
+        h3("Input required"),
+        tags$div(
+          tags$ul(
+            tags$li(tags$b("The output language desired.")," Edit the text box below to change."),
+            tags$li(tags$b("Table.")," Provide a table of characters in csv format."),
+            tags$li(tags$b("Template description.")," Provide a natural-language description to use as template.")
+          )
+        ),
         tabsetPanel(type = "tabs",
-                    tabPanel("Input"),
-                    tabPanel("Result"))
+                    tabPanel("Input",
+                             textInput(
+                               "writeLanguage",
+                               "Language to output",
+                               value = read_file("defaults/language.txt")
+                             ),
+                             fileInput(
+                               "writeTableFile",
+                               NULL,
+                               accept = ".csv",
+                               buttonLabel = "Upload csv..."
+                             ),
+                             DTOutput("writeTable"),
+                             textAreaInput(
+                               "writeTemplate",
+                               "Description to use as template",
+                               value = read_file("defaults/write/template_description.txt"),
+                               rows = 10,
+                               width = "100%"
+                             )
+                    ),
+                    tabPanel("Result",
+                             p("Use the prompt below to create a natural language description from a table."),
+                             uiOutput("writeOutputUI")
+                             )
+      )
       ),
       tabItem(
         tabName = "parseSpecimenList",
@@ -284,7 +320,8 @@ server <- function(input, output) {
   
   #initialize reactive values
   rv = reactiveValues(parseExamplePath = "defaults/parse/example.csv",
-                      completeTablePath = "defaults/complete/table.csv"
+                      completeTablePath = "defaults/complete/table.csv",
+                      writeTablePath = "defaults/write/input_table.csv"
                       )
   
   chatGPTlink = a("Go to chatGPT", href = "https://chat.openai.com", target = "_blank", class="btn btn-primary")
@@ -477,6 +514,58 @@ server <- function(input, output) {
   })
   
   
+  
+  ######################## WRITE server-side ###########################
+  ### Reactive input handling
+  #change example table if a new table uploaded
+  observeEvent(input$writeTableFile,
+               {
+                 rv$writeTablePath = input$writeTableFile$datapath
+               })
+  
+  #update parsed example table
+  observe({
+    rv$writeTableDF = read_csv(rv$writeTablePath)
+    rv$writeTableDT = datatable(rv$writeTableDF,
+                                  filter = "none",
+                                  options = list(dom = "t", ordering = F))
+  })
+  #update table in UI
+  observe({
+    output$writeTable = renderDT(datatable(
+      read_csv(rv$writeTablePath),
+      filter = "none",
+      options = list(dom = "t", ordering = F)
+    ))
+  })
+  
+  #generate output
+  observe({
+    
+    rv$writeOutputPrompt = fill_writeDescription(
+      character_table = rv$writeTableDF,
+      template_description = input$writeTemplate,
+      language = input$writeLanguage
+    )
+    output$writeOutputPrompt = renderText(rv$writeOutputPrompt)
+    output$writeOutputUI = renderUI({
+      fluidPage(
+        fluidRow("This function does not check input size. If your prompt is too long, consider reducing the input. For example, by using as template a single paragraph at a time."),
+        fluidRow(
+          rclipButton(
+            "writeOutputClip",
+            "Copy to clipboard",
+            rv$writeOutputPrompt
+          ),
+          chatGPTlink,
+          bardlink
+        ),
+        fluidRow(verbatimTextOutput("writeOutputPrompt"))
+      )
+    }
+    )
+    
+  })
   
   
 }
