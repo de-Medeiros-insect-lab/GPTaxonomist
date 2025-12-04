@@ -1,4 +1,4 @@
-Given the following taxonomic description, extract a list of characters and their states. The list must contain all characters in the description, with no exceptions. Correct typos if you see one.
+Act like a taxonomist. Given the following taxonomic description, extract a list of characters and their states. The list must contain all characters in the description, with no exceptions. Correct typos if you see one.
 
 As output, produce a table with one character per row. Each row contains a single property of a given structure. Split properties for the same structure in separate rows if needed. Example properties are shape, color, aspect, position, vestiture, punctuation, setation, but there are others. Each character will be formatted as follows:
 
@@ -6,7 +6,7 @@ Column 1: character name, with the following format: [semaphoront], [major body 
 
 Column 2: observed state
 
-Semaphoronts are sexes or life stages.
+Replace "semaphoront" with sex or life stage being observed.
 
 In typical taxonomic descriptions, paragraphs usually group major a body area. Specific body areas are grouped by sentence, and more specific body areas are separated by semicolons within sentences. This structure may vary, so be flexible and use logic.
 
@@ -21,4 +21,4 @@ Here go a few examples of the output expected. Your output should not include th
 ```
 ${EXAMPLE}
 ```
-After you finish, explicitly say you are done. Translate the response to ${LANGUAGE} if this is not the original language. Include only the output table in response. Do not prepend anything to table in any circumstance. Format the table properly for easy copying from here to paste in Excel.
+After you finish, explicitly say you are done. Format the response as a table entirely written in ${LANGUAGE}. 

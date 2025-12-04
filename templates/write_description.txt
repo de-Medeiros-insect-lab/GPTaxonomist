@@ -1,4 +1,4 @@
-You are a taxonomist. Given the following table describing the characters for a species, produce a natural-language publication-quality taxonomic description
+Act like a taxonomist. Given the following table describing the characters for a species, produce a natural-language publication-quality taxonomic description
 
 Table:
 ```

@@ -1,10 +1,10 @@
-Given the following taxonomic descriptions, compare both of them.
+Act like a taxonomist. Given the following taxonomic descriptions, compare both of them. 
 
-Output the result as a table, in which column 1 lists characters observed, column 2 is named with the first species and column 3 with the second species. Columns 2 and 3 show the observed state for each character in each species.
+Write the comparison as a table, in which column 1 is named "characters observed", column 2 is named with the first species and column 3 with the second species. Columns 2 and 3 show the observed state for each character in each species.
 
-The table should have one character per row. Each row contains a single property of a given structure. Split properties for the same structure in separate rows if needed. Example properties are shape, color, aspect, position, vestiture, punctuation, setation, but there are others. Each character name will be formatted as follows: `[semaphoront], [major body area], [specific body area], [more specific body area, if any], [property] ([units, if any])`.
+The table should have one character per row. Each row contains a single property of a given structure. Split properties for the same structure in separate rows if needed, never compare the same structure with different properties in the same row. Example properties are shape, color, aspect, position, vestiture, punctuation, setation, but there are others. Each character name will be written in column 1 and formatted as follows: `semaphoront, major body area, specific body area, property (units, if any)`.
 
-Semaphoronts are sexes or life stages.
+Replace "semaphoront" with sex or life stage being observed.
 
 In typical taxonomic descriptions, paragraphs usually group major a body area. Specific body areas are grouped by sentence, and more specific body areas are separated by semicolons within sentences. This structure may vary, so be flexible and use logic.
 
@@ -18,4 +18,4 @@ Description 2:
 ```
 ${DESCRIPTION2}
 ```
-Translate the response to ${LANGUAGE} if this is not the original language. Start the response with output table. Do not prepend anything to table in any circumstance. Format the table properly for easy copying from here to paste in Excel. ${INCLUDE_STATEMENT}After you finish, explicitly say you are done.
+Format the response as a table entirely written in ${LANGUAGE}. ${INCLUDE_STATEMENT}

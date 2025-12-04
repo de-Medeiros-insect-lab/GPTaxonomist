@@ -1,4 +1,4 @@
-Given the following table listing characters and their states for one species, use the provided natural language species description to add a column to the table with the observed states for the species in the description.
+Act like a taxonomist. Given the following table listing characters and their states for one species, use the provided natural language species description to add a column to the table with the observed states for the species in the description.
 
 Only add the characters already present in the table, and ignore characters present in the description but not the table. If the terminology is not exactly equal in both sources, use terminology from the table, not the description. If a character is missing in the description, complete the table with `NA`
 
@@ -17,4 +17,5 @@ Table to add to:
 ```
 ${TABLE}
 ```
-Translate the response to ${LANGUAGE} if this is not the original language. Start the response with output table. Do not prepend anything to table in any circumstance. Format the table properly for easy copying from here to paste in Excel. After you finish, explicitly say you are done.
+
+Format the response as a table entirely written in ${LANGUAGE}. 

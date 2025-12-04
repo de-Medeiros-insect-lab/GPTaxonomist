@@ -1,6 +1,25 @@
 #some default values
-complete_table_word_limit = 300
-parse_paragraph_word_limit = 500
+complete_table_word_limit = 10000000
+parse_paragraph_word_limit = 10000000
+
+#read a table, possibly in several formats
+read_table_robust = function(file){
+  ext <- tools::file_ext(file)
+  df = tryCatch({
+    switch(ext,
+           csv = read.csv(file),
+           tsv = read.delim(file),
+           txt = read.delim(file),
+           xls = readxl::read_excel(file),
+           xlsx = readxl::read_excel(file),
+           stop("Unsupported file format")
+    )
+  }, error = function(e) {
+    stop("Error reading file: ", e$message)
+  })
+  return(df)
+  
+}
 
 #format a markdown table
 format_table = function(df){
@@ -77,7 +96,7 @@ fill_compareDescriptions = function(description1, description2, language, exclud
   template = read_file('templates/compare_description.txt')
   
   if (exclude_unique){
-    unique_statement = "Only include characters observed in both species. "
+    unique_statement = "Only include characters observed in both species descriptions (skip row if one is missing or not observed). "
   } else {
     unique_statement = "Include all characters, fill up with NA if not observed for a species. "
   }
