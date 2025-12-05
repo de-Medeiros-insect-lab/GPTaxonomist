@@ -1,26 +1,71 @@
-Act like a taxonomist. Given the following taxonomic descriptions, compare both of them. 
+FORMATTING INSTRUCTIONS:
+- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
+- Wrap your final table output in <results></results> tags.
+- The content between <results></results> tags should contain ONLY the final markdown table, nothing else.
 
-Write the comparison as a table, in which column 1 is named "characters observed", column 2 is named with the first species and column 3 with the second species. Columns 2 and 3 show the observed state for each character in each species.
+---
 
-The table should have one character per row. Each row contains a single property of a given structure. Split properties for the same structure in separate rows if needed, never compare the same structure with different properties in the same row. Example properties are shape, color, aspect, position, vestiture, punctuation, setation, but there are others. Each character name will be written in column 1 and formatted as follows: `semaphoront, major body area, specific body area, property (units, if any)`.
+TASK:
+You are an expert taxonomist. Compare two taxonomic descriptions and produce a side-by-side comparison table showing character states for both species.
 
-Replace "semaphoront" with sex or life stage being observed.
-
-In typical taxonomic descriptions, paragraphs usually group major a body area. Specific body areas are grouped by sentence, and more specific body areas are separated by semicolons within sentences. This structure may vary, so be flexible and use logic.
-
-If you observe a typo, correct it. Descriptions might have been read using OCR, so they may contain errors that you need to correct.
-
-Description 1:
+DESCRIPTION 1:
 ```
 ${DESCRIPTION1}
 ```
-Description 2:
+
+DESCRIPTION 2:
 ```
 ${DESCRIPTION2}
 ```
-Format the response as a table entirely written in ${LANGUAGE}. ${INCLUDE_STATEMENT}
 
-IMPORTANT FORMATTING INSTRUCTIONS:
-- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
-- Wrap your final table output in <results></results> tags.
-- The content between <results></results> tags should contain ONLY the final table, nothing else.
+OUTPUT REQUIREMENTS:
+
+1. **Table Format**: Produce a markdown pipe table with three columns:
+   - Column 1: "Characters observed"
+   - Column 2: Species name from description 1 (extract from text)
+   - Column 3: Species name from description 2 (extract from text)
+
+2. **Character Name Format**: Use this hierarchical structure in column 1:
+   [semaphoront], [major body area], [specific body area], [more specific area if any], [property] ([units if any])
+
+   Examples:
+   - "Adult male, head, vertex, punctation, density"
+   - "Adult female, wing, hind wing, length (mm)"
+   - "Adult, thorax, pronotum, color"
+
+3. **Character Granularity**:
+   - One character per row
+   - Each row compares a single property of a structure
+   - Split multiple properties of the same structure into separate rows
+   - Each row must compare the SAME property across both species
+   - Common properties: shape, size, color, texture, aspect, position, vestiture, punctation, setation, sculpture
+
+4. **Character Coverage**:
+   ${INCLUDE_STATEMENT}
+
+5. **Parsing Logic**:
+   - Replace "semaphoront" with the actual sex or life stage (e.g., "Adult male", "Female", "Larva")
+   - Paragraphs typically group characters by major body area
+   - Sentences typically group characters by specific body area
+   - Semicolons within sentences often separate more specific areas
+   - Be flexible - this structure may vary depending on the author
+
+6. **Character Alignment**:
+   - Match equivalent characters even if described using different terminology
+   - If one description uses "reddish-brown" and another uses "rufous", recognize these as the same character (color) with different states
+   - Align measurement characters even if units or precision differ
+
+7. **Language**: Output the entire table in ${LANGUAGE}
+
+8. **Error Handling**:
+   - Correct obvious typos and OCR errors
+   - Descriptions may have been digitized with OCR and contain scanning errors
+   - Preserve measurement ranges (e.g., "3-5 mm") as given
+   - If a character state is ambiguous or unclear, include your best interpretation
+
+EXAMPLE OUTPUT STRUCTURE:
+| Characters observed | Species A | Species B |
+|:---|:---|:---|
+| Adult male, head, vertex, color | black | reddish-brown |
+| Adult male, head, vertex, punctation | densely punctate | sparsely punctate |
+| Adult male, wing, fore wing, length (mm) | 4.2-4.8 | 3.8-4.1 |

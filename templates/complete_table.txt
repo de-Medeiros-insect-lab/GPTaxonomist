@@ -1,26 +1,60 @@
-Act like a taxonomist. Given the following table listing characters and their states for one species, use the provided natural language species description to add a column to the table with the observed states for the species in the description.
+FORMATTING INSTRUCTIONS:
+- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
+- Wrap your final table output in <results></results> tags.
+- The content between <results></results> tags should contain ONLY the final markdown table, nothing else.
 
-Only add the characters already present in the table, and ignore characters present in the description but not the table. If the terminology is not exactly equal in both sources, use terminology from the table, not the description. If a character is missing in the description, complete the table with `NA`
+---
 
-If the original language is not ${LANGUAGE}, translate the results to ${LANGUAGE}. Otherwise, do not attempt any translation. 
+TASK:
+You are an expert taxonomist. Given a character table template and a natural language species description, populate the table with character states extracted from the description.
 
-As output, produce a table in which columns 1 is identical to the table provided. Ommit column 2. Column 3 should be named with the name of the species in the description and should list the observed states in the description.
-
-Only include characters already present in the table,do not add new rows to the table.
-
-Description to parse:
+TAXONOMIC DESCRIPTION:
 ```
 ${DESCRIPTION}
 ```
 
-Table to add to:
+CHARACTER TABLE TEMPLATE:
 ```
 ${TABLE}
 ```
 
-Format the response as a table entirely written in ${LANGUAGE}.
+OUTPUT REQUIREMENTS:
 
-IMPORTANT FORMATTING INSTRUCTIONS:
-- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
-- Wrap your final table output in <results></results> tags.
-- The content between <results></results> tags should contain ONLY the final table, nothing else. 
+1. **Table Structure**: Produce a markdown pipe table with:
+   - Column 1: Character names (identical to the template table, column 1)
+   - Column 2: Observed states for the species in the description (name this column with the species name from the description)
+   - Do NOT include column 2 from the template table
+
+2. **Character Coverage**:
+   - Only include characters already present in the template table
+   - Do NOT add new rows for characters mentioned in the description but absent from the table
+   - Process every row from the template table
+
+3. **Missing Data Handling**:
+   - If a character from the table is not mentioned in the description, enter `NA`
+   - If a character is described ambiguously, enter `NA` and note the ambiguity in your thinking
+
+4. **Terminology Matching**:
+   - Use terminology from the table, not the description
+   - If the description uses synonyms or different wording (e.g., "reddish-brown" vs "color"), match to the appropriate table character
+   - If measurement units differ, convert to the units specified in the table character name
+
+5. **State Extraction**:
+   - Extract the state value exactly as described in the text
+   - Preserve measurement ranges (e.g., "3-5 mm")
+   - If multiple states are given, include all of them
+
+6. **Language**: Output the entire table in ${LANGUAGE}, translating character states from the description if needed
+
+EXAMPLE WORKFLOW:
+- Template row: "Adult male, head, color"
+- Description says: "head black with reddish tinge"
+- Output: "black with reddish tinge"
+
+- Template row: "Adult female, wing, length (mm)"
+- Description says: "wings 4.2-4.8 mm long"
+- Output: "4.2-4.8"
+
+- Template row: "Adult male, pronotum, punctation"
+- Description doesn't mention pronotum punctation
+- Output: "NA" 

@@ -1,29 +1,61 @@
-Act like a taxonomist. Given the following taxonomic description, extract a list of characters and their states. The list must contain all characters in the description, with no exceptions. Correct typos if you see one.
+FORMATTING INSTRUCTIONS:
+- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
+- Wrap your final table output in <results></results> tags.
+- The content between <results></results> tags should contain ONLY the final markdown table, nothing else.
 
-As output, produce a table with one character per row. Each row contains a single property of a given structure. Split properties for the same structure in separate rows if needed. Example properties are shape, color, aspect, position, vestiture, punctuation, setation, but there are others. Each character will be formatted as follows:
+---
 
-Column 1: character name, with the following format: [semaphoront], [major body area], [specific body area], [more specific body area, if any], [property] ([units, if any])
+TASK:
+You are an expert taxonomist. Extract all morphological characters and their states from the taxonomic description below and organize them into a structured table.
 
-Column 2: observed state
-
-Replace "semaphoront" with sex or life stage being observed.
-
-In typical taxonomic descriptions, paragraphs usually group major a body area. Specific body areas are grouped by sentence, and more specific body areas are separated by semicolons within sentences. This structure may vary, so be flexible and use logic.
-
-If you observe a typo, correct it.
-
+TAXONOMIC DESCRIPTION:
 ```
 ${DESCRIPTION}
 ```
 
-Here go a few examples of the output expected. Your output should not include the example. Include every single character in the same order they are listed in the original description. Do not include any characters absent in the description.
+OUTPUT REQUIREMENTS:
+
+1. **Table Format**: Produce a markdown pipe table with two columns:
+   - Column 1: Character name
+   - Column 2: Observed state
+
+2. **Character Name Format**: Use this hierarchical structure:
+   [semaphoront], [major body area], [specific body area], [more specific area if any], [property] ([units if any])
+
+   Examples:
+   - "Adult male, head, vertex, punctation, density"
+   - "Adult female, wing, hind wing, length (mm)"
+   - "Larva, abdomen, tergite 3, setation"
+
+3. **Character Granularity**:
+   - One character per row
+   - Each row describes a single property of a structure
+   - Split multiple properties of the same structure into separate rows
+   - Common properties: shape, size, color, texture, aspect, position, vestiture, punctation, setation, sculpture
+
+4. **Parsing Logic**:
+   - Replace "semaphoront" with the actual sex or life stage (e.g., "Adult male", "Female", "Larva")
+   - Paragraphs typically group characters by major body area
+   - Sentences typically group characters by specific body area
+   - Semicolons within sentences often separate more specific areas
+   - Be flexible - this structure may vary depending on the author
+
+5. **Character Order**: Include every character in the same order as they appear in the original description
+
+6. **Completeness**: Extract ALL characters from the description with no exceptions
+
+7. **Language**: Output the entire table in ${LANGUAGE}
+
+8. **Error Handling**:
+   - Correct obvious typos and OCR errors
+   - If measurement ranges are given (e.g., "3-5 mm"), keep them as ranges
+   - If a state is implicit (e.g., "smooth" implies absence of punctation), extract it as stated
+
+EXAMPLE OUTPUT FORMAT:
+The following examples show the expected output structure. Your output should follow this format but contain only characters from the description above:
 
 ```
 ${EXAMPLE}
 ```
-After you finish, explicitly say you are done. Format the response as a table entirely written in ${LANGUAGE}.
 
-IMPORTANT FORMATTING INSTRUCTIONS:
-- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
-- Wrap your final table output in <results></results> tags.
-- The content between <results></results> tags should contain ONLY the final table, nothing else. 
+Do not include characters from the examples in your output. Only extract characters actually present in the description provided above. 

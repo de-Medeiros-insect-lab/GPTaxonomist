@@ -1,28 +1,72 @@
-Act like a taxonomist. Given the following table describing the characters for a species, produce a natural-language publication-quality taxonomic description
+FORMATTING INSTRUCTIONS:
+- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
+- Wrap your final description output in <results></results> tags.
+- The content between <results></results> tags should contain ONLY the final description prose, nothing else.
+- If characters from the table are not in the template, list them as warnings in <thinking>, not in <results>.
 
-Table:
+---
+
+TASK:
+You are an expert taxonomist. Generate a publication-quality natural language taxonomic description from a character table, following the style and structure of a provided template description.
+
+CHARACTER TABLE:
 ```
 ${CHARACTER_TABLE}
 ```
 
-The resulting description must be consistent with the description of similar taxa. Here I provide the description of this other taxon as a template.
-
-Template:
+TEMPLATE DESCRIPTION:
 ```
 ${TEMPLATE_DESCRIPTION}
 ```
 
-The result should strictly follow these rules:
-- publication-quality description
-- telegraphic language
-- if a character state is not observed in the table, skip this character, do not mention it. Do not say it was not observed, just ignore it.
-- if a character exists in the table but not the template, ignore it in the output description but raise a warning at the end.
-- character names and order must follow the template, except for those not observed in the table.
-- punctuation and line breaks must follow the template, skipping characters not observed in the table.
-- observed states must follow the table, NOT the template. Never use observed states from the template.
-- output language must be ${LANGUAGE}. Translate if needed.
+OUTPUT REQUIREMENTS:
 
-IMPORTANT FORMATTING INSTRUCTIONS:
-- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
-- Wrap your final description output in <results></results> tags.
-- The content between <results></results> tags should contain ONLY the final description, nothing else.
+1. **Writing Style**: Use telegraphic language typical of taxonomic descriptions
+   - Omit articles (a, an, the) where conventional: "Head black" not "The head is black"
+   - Use terse, precise phrasing: "punctate" not "covered with punctures"
+   - Employ standard taxonomic terminology and abbreviations
+   - Example: "Body elongate, black; head sparsely punctate; antennae filiform, 11-segmented."
+
+2. **Template Adherence**:
+   - Follow the template's organizational structure (paragraph breaks, section order)
+   - Follow the template's punctuation style (semicolons, commas, periods)
+   - Follow the template's character sequence
+   - Match the template's level of detail and phrasing patterns
+
+3. **Character States from Table**:
+   - Use observed states ONLY from the character table
+   - NEVER use state values from the template description
+   - If the table says "black" and template says "brown", write "black"
+
+4. **Handling Missing Data**:
+   - If a character appears in the template but is not in the table (or is `NA`), skip it entirely
+   - Do not write "not observed" or leave blanks - simply omit the character
+   - Adjust punctuation smoothly when omitting characters (e.g., if skipping a semicolon-separated phrase)
+
+5. **Handling Extra Characters**:
+   - If a character exists in the table but not in the template, do NOT include it in the description
+   - Note these extra characters in your <thinking> tags as warnings: "Warning: Character '[name]' from table not found in template"
+
+6. **Character Order**:
+   - Maintain the template's character sequence
+   - When skipping unobserved characters, preserve the relative order of remaining characters
+
+7. **Measurements and Formatting**:
+   - Preserve measurement ranges from the table (e.g., "3.2-4.5 mm")
+   - Use appropriate decimal places based on the table values
+   - Include units as specified in the table
+
+8. **Language**: Output the entire description in ${LANGUAGE}, translating character states if needed
+
+EXAMPLE:
+Template: "Body elongate, brown; head densely punctate; eyes large."
+Table has: Body shape = "elongate", Body color = "black", Head punctation = "sparsely punctate"
+(Eyes not in table)
+
+Output: "Body elongate, black; head sparsely punctate."
+
+Explanation:
+- Kept structure from template
+- Used "black" from table (not "brown" from template)
+- Used "sparsely punctate" from table (not "densely punctate" from template)
+- Omitted "eyes large" (not in table)
