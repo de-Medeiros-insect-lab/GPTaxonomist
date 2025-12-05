@@ -21,3 +21,8 @@ The result should strictly follow these rules:
 - punctuation and line breaks must follow the template, skipping characters not observed in the table.
 - observed states must follow the table, NOT the template. Never use observed states from the template.
 - output language must be ${LANGUAGE}. Translate if needed.
+
+IMPORTANT FORMATTING INSTRUCTIONS:
+- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
+- Wrap your final description output in <results></results> tags.
+- The content between <results></results> tags should contain ONLY the final description, nothing else.

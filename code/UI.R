@@ -1,3 +1,84 @@
+###### CONFIGURATION
+
+UI_config = tabItem(
+  tabName = "config",
+  h2("Configuration"),
+
+  h3("Welcome to GPTaxonomist!"),
+  p(
+    "This is an interactive tool to help generate useful prompts for taxonomic tasks using large language models."
+  ),
+  p(
+    "You can use this tool in two ways:"
+  ),
+  tags$div(
+    tags$ul(
+      tags$li(tags$b("Copy prompts to external LLM:"), " Generate prompts and copy them to ChatGPT, Claude AI, or any other LLM interface (default mode)."),
+      tags$li(tags$b("Run prompts directly:"), " Configure an API connection below to run prompts and see results directly in this application.")
+    )
+  ),
+
+  hr(),
+
+  h3("LLM Configuration"),
+  p("Select how you want to use this application:"),
+
+  radioButtons(
+    "llmProvider",
+    "LLM Provider:",
+    choices = list(
+      "None (copy prompts only)" = "none",
+      "OpenAI API" = "openai",
+      "Anthropic API" = "anthropic",
+      "Ollama (local server)" = "ollama"
+    ),
+    selected = "none"
+  ),
+
+  conditionalPanel(
+    condition = "input.llmProvider == 'openai'",
+    h4("OpenAI API Configuration"),
+    p("You need an OpenAI API key to use this option."),
+    a("Get an OpenAI API key", href = "https://platform.openai.com/api-keys", target = "_blank"),
+    p(),
+    uiOutput("openaiKeyDetected"),
+    passwordInput("openaiApiKey", "API Key:", placeholder = "sk-..."),
+    p(tags$small("Your API key is only stored in this session and is never saved."))
+  ),
+
+  conditionalPanel(
+    condition = "input.llmProvider == 'anthropic'",
+    h4("Anthropic API Configuration"),
+    p("You need an Anthropic API key to use this option."),
+    a("Get an Anthropic API key", href = "https://console.anthropic.com/settings/keys", target = "_blank"),
+    p(),
+    uiOutput("anthropicKeyDetected"),
+    passwordInput("anthropicApiKey", "API Key:", placeholder = "sk-ant-..."),
+    p(tags$small("Your API key is only stored in this session and is never saved."))
+  ),
+
+  conditionalPanel(
+    condition = "input.llmProvider == 'ollama'",
+    h4("Ollama Configuration"),
+    p("Ollama allows you to run large language models locally on your computer."),
+    a("Learn how to install Ollama", href = "https://ollama.com/download", target = "_blank"),
+    p(),
+    p("After installing Ollama, you can download models using:", tags$code("ollama pull <model-name>")),
+    a("Browse available Ollama models", href = "https://ollama.com/library", target = "_blank"),
+    p(),
+    textInput("ollamaHost", "Host:", value = ollama_default_host),
+    textInput("ollamaPort", "Port:", value = ollama_default_port),
+    textInput("ollamaModel", "Model name:", value = ollama_default_model,
+              placeholder = "e.g., deepseek-r1:1.5b, llama3.2, mistral"),
+    p(tags$small("Make sure Ollama is running on your system before using this option."))
+  ),
+
+  hr(),
+
+  uiOutput("configStatus")
+)
+
+
 ###### PARSE
 
 UI_parse = tabItem(
@@ -15,44 +96,53 @@ UI_parse = tabItem(
   ),
   
   
-  tabsetPanel(
-    type = "tabs",
-    tabPanel(
-      "Input",
-      p("Edit text and table below with your data."),
-      textInput(
-        "parseLanguage",
-        "Language to output",
-        value = read_file("defaults/language.txt")
-      ),
-      textAreaInput(
-        "parseDesc",
-        "Description to parse",
-        value = read_file("defaults/parse/description.txt"),
-        rows = 10,
-        width = "100%"
-      ),
-      strong("Examples"),
-      p("Upload a data table to change examples."),
-      fileInput(
-        "parseExampleFile",
-        NULL,
-        accept = c(".csv", ".tsv", ".txt", ".xls", ".xlsx"),
-        buttonLabel = "Upload table..."
-      ),
-      DTOutput("parseTable1")
-    ),
-    tabPanel(
-      "Results",
-      p("If your input description was too long, we automatically split it in smaller chuncks by paragraph so it is possible to use chatGPT or Bard."),
-      p(
-        "Navigate the tabs below to see the prompts generated. 
-                              Copy and paste them in chatGPT or Bard to get the desired result. 
-                              If GPT response is too long and the response get cut in the middle, use the following to continue:",
-        tags$i("Continue from the last incomplete row, repeat table headers.")
-      ),
-      uiOutput("parseOutputTabs")
-    )
+  tabsetPanel(type = "tabs", id = "parseTabset",
+              tabPanel("Input",
+                       p("Edit text and table below with your data."),
+                       textInput(
+                         "parseLanguage",
+                         "Language to output",
+                         value = read_file("defaults/language.txt")
+                       ),
+                       textAreaInput(
+                         "parseDesc",
+                         "Description to parse",
+                         value = read_file("defaults/parse/description.txt"),
+                         rows = 10,
+                         width = "100%"
+                       ),
+                       strong("Examples"),
+                       p("Upload a data table to change examples."),
+                       fileInput(
+                         "parseExampleFile",
+                         NULL,
+                         accept = c(".csv", ".tsv", ".txt", ".xls", ".xlsx"),
+                         buttonLabel = "Upload table..."
+                       ),
+                       DTOutput("parseTable1")
+              ),
+              tabPanel("Generated prompt",
+                       uiOutput("parsePromptUI")
+              ),
+              tabPanel("Results",
+                       conditionalPanel(
+                         condition = "input.llmProvider != 'none'",
+                         fluidRow(
+                           class = "my-margin",
+                           h4("Raw response:"),
+                           uiOutput("parseRawResponse")
+                         ),
+                         fluidRow(
+                           class = "my-margin",
+                           h4("Result:"),
+                           uiOutput("parseExtractedResult")
+                         )
+                       ),
+                       conditionalPanel(
+                         condition = "input.llmProvider == 'none'",
+                         p("Configure an LLM provider in the Configuration tab to see results here.")
+                       )
+              )
   )
 )
 
@@ -70,7 +160,7 @@ UI_complete = tabItem(
       tags$li(tags$b("A table to be filled out.")," This must include 2 columns: one with character names and another with observed states for an example species. The second column may be blank, but it will work better if not. Create a table in csv or excel and upload it here using the button below.")
     )
   ),
-  tabsetPanel(type = "tabs",
+  tabsetPanel(type = "tabs", id = "completeTabset",
               tabPanel("Input",
                        textInput(
                          "completeLanguage",
@@ -94,16 +184,29 @@ UI_complete = tabItem(
                        ),
                        DTOutput("completeTable1")
               ),
-              tabPanel("Result",
-                       p("If your input table was too long, we automatically split it in smaller tables so it is possible to use chatGPT or Bard."),
-                       p(
-                         "Navigate the tabs below to see the prompts generated. 
-                              Copy and paste them in chatGPT or Bard to get the desired result. 
-                              If GPT response is too long and the response get cut in the middle, use the following to continue:",
-                         tags$i("Continue from the last incomplete row, repeat table headers.")
+              tabPanel("Generated prompt",
+                       uiOutput("completePromptUI")
+              ),
+              tabPanel("Results",
+                       conditionalPanel(
+                         condition = "input.llmProvider != 'none'",
+                         fluidRow(
+                           class = "my-margin",
+                           h4("Raw response:"),
+                           uiOutput("completeRawResponse")
+                         ),
+                         fluidRow(
+                           class = "my-margin",
+                           h4("Result:"),
+                           uiOutput("completeExtractedResult")
+                         )
                        ),
-                       uiOutput("completeOutputTabs")
-              ))
+                       conditionalPanel(
+                         condition = "input.llmProvider == 'none'",
+                         p("Configure an LLM provider in the Configuration tab to see results here.")
+                       )
+              )
+  )
 )
 
 UI_compare = ###################################### COMPARE UI ####################################
@@ -120,7 +223,7 @@ tabItem(
       tags$li(tags$b("Description 2.")," Edit the text box below to change.")
     )
   ),
-  tabsetPanel(type = "tabs",
+  tabsetPanel(type = "tabs", id = "compareTabset",
               tabPanel("Input",
                        textInput(
                          "compareLanguage",
@@ -146,9 +249,27 @@ tabItem(
                          width = "100%"
                        )
               ),
-              tabPanel("Result",
-                       p("Use the prompt below to compare the descriptions and get a table."),
-                       uiOutput("compareOutputUI")
+              tabPanel("Generated prompt",
+                       uiOutput("comparePromptUI")
+              ),
+              tabPanel("Results",
+                       conditionalPanel(
+                         condition = "input.llmProvider != 'none'",
+                         fluidRow(
+                           class = "my-margin",
+                           h4("Raw response:"),
+                           uiOutput("compareRawResponse")
+                         ),
+                         fluidRow(
+                           class = "my-margin",
+                           h4("Result:"),
+                           uiOutput("compareExtractedResult")
+                         )
+                       ),
+                       conditionalPanel(
+                         condition = "input.llmProvider == 'none'",
+                         p("Configure an LLM provider in the Configuration tab to see results here.")
+                       )
               )
   )
   
@@ -170,7 +291,7 @@ UI_write = tabItem(
       tags$li(tags$b("Template description.")," Provide a natural-language description to use as template.")
     )
   ),
-  tabsetPanel(type = "tabs",
+  tabsetPanel(type = "tabs", id = "writeTabset",
               tabPanel("Input",
                        textInput(
                          "writeLanguage",
@@ -192,9 +313,27 @@ UI_write = tabItem(
                          width = "100%"
                        )
               ),
-              tabPanel("Result",
-                       p("Use the prompt below to create a natural language description from a table."),
-                       uiOutput("writeOutputUI")
+              tabPanel("Generated prompt",
+                       uiOutput("writePromptUI")
+              ),
+              tabPanel("Results",
+                       conditionalPanel(
+                         condition = "input.llmProvider != 'none'",
+                         fluidRow(
+                           class = "my-margin",
+                           h4("Raw response:"),
+                           uiOutput("writeRawResponse")
+                         ),
+                         fluidRow(
+                           class = "my-margin",
+                           h4("Result:"),
+                           uiOutput("writeExtractedResult")
+                         )
+                       ),
+                       conditionalPanel(
+                         condition = "input.llmProvider == 'none'",
+                         p("Configure an LLM provider in the Configuration tab to see results here.")
+                       )
               )
   )
 )

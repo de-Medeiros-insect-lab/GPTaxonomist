@@ -21,4 +21,9 @@ Here go a few examples of the output expected. Your output should not include th
 ```
 ${EXAMPLE}
 ```
-After you finish, explicitly say you are done. Format the response as a table entirely written in ${LANGUAGE}. 
+After you finish, explicitly say you are done. Format the response as a table entirely written in ${LANGUAGE}.
+
+IMPORTANT FORMATTING INSTRUCTIONS:
+- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
+- Wrap your final table output in <results></results> tags.
+- The content between <results></results> tags should contain ONLY the final table, nothing else. 

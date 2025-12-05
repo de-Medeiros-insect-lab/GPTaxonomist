@@ -19,3 +19,8 @@ Description 2:
 ${DESCRIPTION2}
 ```
 Format the response as a table entirely written in ${LANGUAGE}. ${INCLUDE_STATEMENT}
+
+IMPORTANT FORMATTING INSTRUCTIONS:
+- If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
+- Wrap your final table output in <results></results> tags.
+- The content between <results></results> tags should contain ONLY the final table, nothing else.

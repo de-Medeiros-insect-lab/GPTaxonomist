@@ -13,11 +13,20 @@ Field Museum of Natural History, Chicago, IL, USA
 
 ## Features
 
+### LLM Integration
+- **Copy-only mode**: Generate prompts and copy them to ChatGPT, Claude AI, or any LLM interface (default)
+- **Direct API execution**: Run prompts directly within the app using:
+  - OpenAI API (GPT-4o-mini)
+  - Anthropic API (Claude 3.5 Haiku)
+  - Ollama (local LLM server)
+- Automatic API key detection from environment variables
+- Response extraction and formatting
+
 ### 1. Parse Descriptions
 Convert natural language taxonomic descriptions into structured tables.
 - Input: A text description and example table (CSV or Excel)
 - Output: AI-ready prompts to extract characters and states into table format
-- Automatically splits long descriptions into manageable chunks
+- Direct execution shows raw response and extracted results
 
 ### 2. Complete Table
 Fill out pre-made character tables using natural language descriptions.
@@ -51,11 +60,31 @@ Tools for parsing and writing lists of examined specimens.
     "shiny",
     "shinydashboard",
     "rclipboard",
-    "tidyverse",
+    "dplyr",
+    "readr",
+    "stringr",
+    "purrr",
+    "tidyr",
+    "tibble",
     "DT",
-    "readxl"
+    "readxl",
+    "httr2"
   ))
   ```
+
+### Optional: API Configuration
+
+To run prompts directly in the application:
+
+- **OpenAI**: Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+- **Anthropic**: Get an API key from [Anthropic Console](https://console.anthropic.com/)
+- **Ollama**: Install [Ollama](https://ollama.ai/) for local LLM execution
+
+API keys can be provided in the Configuration page or set as environment variables:
+```bash
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
 
 ### Running the Application
 
@@ -74,20 +103,33 @@ Tools for parsing and writing lists of examined specimens.
 
 ## Usage
 
+### Configuration (First Time Setup)
+
+1. Open the **Configuration** page from the sidebar
+2. Choose your preferred LLM provider:
+   - **None**: Copy prompts manually to external LLM services (default)
+   - **OpenAI API**: Enter API key to use GPT-4o-mini directly
+   - **Anthropic API**: Enter API key to use Claude 3.5 Haiku directly
+   - **Ollama**: Configure local server settings
+
+### Working with Modules
+
 1. **Select a module** from the sidebar menu based on your task
 2. **Prepare your input data**:
-   - For tables: Export as CSV or Excel (.csv, .tsv, .xlsx, .xls)
-   - For descriptions: Copy text into the provided text areas
-3. **Review the generated prompt** in the Results tab
-4. **Copy the prompt** and paste it into ChatGPT or Claude AI
-5. **Copy the AI response** back into your preferred format (Excel, CSV, etc.)
+   - For tables: Upload CSV or Excel files (.csv, .tsv, .xlsx, .xls)
+   - For descriptions: Paste text into the provided text areas
+3. **Review the generated prompt**
+4. **Execute the prompt**:
+   - **Copy-only mode**: Click "Copy to clipboard" and paste into ChatGPT or Claude AI
+   - **API mode**: Click "Run Prompt" to execute directly and see results
 
 ### Tips
 
 - Use 5-10 example rows when providing example tables
-- If AI responses get cut off, use: "Continue from the last incomplete row, repeat table headers"
 - All prompts can be customized by editing the template files in the `templates/` directory
 - Default examples are provided for all modules to help you get started
+- When using API mode, results are extracted automatically from `<results>` tags
+- API keys are only stored in the current session and are never saved to disk
 
 ## File Structure
 
@@ -118,7 +160,8 @@ Edit files in the `defaults/` directory to change the example data shown when th
 
 ## Version History
 
-- **v.0.2** (Current) - UI refactoring, Excel support, Claude AI integration
+- **v.0.3** (Current) - Direct API integration (OpenAI, Anthropic, Ollama), Configuration page, in-app prompt execution
+- **v.0.2** - UI refactoring, Excel support, Claude AI integration
 - **v.0.1** - Initial release with core functionality
 
 ## Contributing
@@ -135,7 +178,7 @@ If you use GPTaxonomist in your research, please cite:
 
 ```
 de Medeiros, B. A. S., & Lira, A. O. (2025). GPTaxonomist: A Shiny application for
-  generating AI prompts for taxonomic descriptions (Version 0.2).
+  generating AI prompts for taxonomic descriptions (Version 0.3).
   https://github.com/de-Medeiros-insect-lab/GPTaxonomist
 ```
 
