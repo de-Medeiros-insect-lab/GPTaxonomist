@@ -40,11 +40,23 @@ rv = reactiveValues(
   parseResponse = NULL,
   completeResponse = NULL,
   compareResponse = NULL,
-  writeResponse = NULL
+  writeResponse = NULL,
+  #model lists for each provider
+  openaiModels = NULL,
+  anthropicModels = NULL,
+  ollamaModels = NULL
 )
 ```
 
 Key pattern: File uploads update `rv$*Path`, which triggers observers to re-read and re-render tables and prompts.
+
+### Helper Reactive Functions
+
+Three helper reactive functions provide consistent access to configuration:
+
+- `getOpenAIKey()` - Returns OpenAI API key from user input or environment
+- `getAnthropicKey()` - Returns Anthropic API key from user input or environment
+- `getOllamaModel()` - Returns effective Ollama model (from dropdown or custom text input)
 
 ### Module Pattern
 
@@ -61,8 +73,8 @@ Each taxonomic task follows the same server-side pattern:
 
 Three API providers supported with unified interface:
 
-- **OpenAI**: `call_openai(prompt, api_key, model)` - uses gpt-4o-mini
-- **Anthropic**: `call_anthropic(prompt, api_key, model)` - uses claude-3-5-haiku-20241022
+- **OpenAI**: `call_openai(prompt, api_key, model)` - supports all chat-compatible models
+- **Anthropic**: `call_anthropic(prompt, api_key, model)` - supports all Claude models
 - **Ollama**: `call_ollama(prompt, host, port, model)` - local LLM server
 
 All API functions return:
@@ -70,7 +82,30 @@ All API functions return:
 list(success = TRUE/FALSE, content = "...", error = "...")
 ```
 
-API keys are detected from environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) and masked for display.
+#### Dynamic Model Selection
+
+The app dynamically fetches available models for each provider:
+
+- **`fetch_openai_models(api_key)`** - Calls `/v1/models` endpoint, filters for chat-compatible models (gpt-4*, gpt-3.5*, o1*, o3*, chatgpt*)
+- **`fetch_anthropic_models(api_key)`** - Calls `/v1/models` endpoint, returns all available Claude models
+- **`fetch_ollama_models(host, port)`** - Calls `/api/tags` endpoint, returns locally installed models
+
+Each function returns `list(success, models, error)` with appropriate error messages guiding users to check API keys/credits or Ollama connection.
+
+Model selection UI shows:
+- Dropdown with available models when fetch succeeds
+- Custom text input for Ollama to enter any model name
+- Error message with troubleshooting guidance when fetch fails
+- "Refresh" button to retry model fetching
+
+#### API Key Detection
+
+API keys are detected from environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) on app startup and masked for display. Keys are session-only, never persisted to disk.
+
+Users can:
+- Enter API keys manually via password inputs
+- Use detected environment variables automatically
+- Click "Refresh environment variables" button if keys were set after app startup
 
 ### Template System
 
@@ -99,12 +134,20 @@ Fill functions use `str_replace_all()` for substitution.
 - `fill_compareDescriptions()` - Compare two descriptions
 - `fill_writeDescription()` - Generate prose from tables
 
+### LLM API Functions
+- `call_openai(prompt, api_key, model)` - Execute prompt via OpenAI API
+- `call_anthropic(prompt, api_key, model)` - Execute prompt via Anthropic API
+- `call_ollama(prompt, host, port, model)` - Execute prompt via Ollama local server
+- `fetch_openai_models(api_key)` - Fetch available OpenAI models
+- `fetch_anthropic_models(api_key)` - Fetch available Anthropic models
+- `fetch_ollama_models(host, port)` - Fetch locally installed Ollama models
+- `detect_api_keys()` - Detect and mask API keys from environment variables
+
 ### Utility Functions
 - `format_table()` - Convert data frame to markdown pipe table
 - `group_paragraphs()` - Split long text by word limits
 - `group_table_rows()` - Split large tables by word limits
 - `extract_results()` - Extract content between `<results>` tags (uses LAST occurrence)
-- `detect_api_keys()` - Find and mask API keys from environment
 
 ## Adding New Modules
 
@@ -132,7 +175,11 @@ Core packages:
 ## Notes
 
 - API keys are session-only, never persisted to disk
+- API keys are detected on startup; use "Refresh environment variables" button if keys are set after launch
+- Model selection is dynamic - fetched from provider APIs when keys/connection are available
+- For Ollama, users can enter any model name, not just locally installed ones
 - Results should be wrapped in `<results>` tags for extraction
 - Default word limits are set very high (`10000000`) - essentially unlimited
 - The app uses FontAwesome icons via `icon()` function
 - Links to external LLM services (ChatGPT, Claude AI) are provided in all module outputs
+- Model fetching errors show specific troubleshooting guidance (check API keys/credits for OpenAI/Anthropic, check connection for Ollama)
