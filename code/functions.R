@@ -266,13 +266,19 @@ extract_results = function(text) {
 
 #detect API keys in environment variables
 detect_api_keys = function(){
+  get_key = function(key_name){
+    value = Sys.getenv(key_name)
+    if(is.null(value)) value = ""
+    return(value)
+  }
+
   keys = list(
     openai = list(
-      value = Sys.getenv("OPENAI_API_KEY"),
+      value = get_key("OPENAI_API_KEY"),
       var_name = "OPENAI_API_KEY"
     ),
     anthropic = list(
-      value = Sys.getenv("ANTHROPIC_API_KEY"),
+      value = get_key("ANTHROPIC_API_KEY"),
       var_name = "ANTHROPIC_API_KEY"
     )
   )
@@ -368,6 +374,149 @@ call_anthropic = function(prompt, api_key, model = "claude-3-5-haiku-20241022"){
     return(list(
       success = FALSE,
       error = paste("Anthropic API error:", e$message)
+    ))
+  })
+}
+
+################## MODEL LISTING FUNCTIONS ##################
+
+#fetch available models from Ollama
+fetch_ollama_models = function(host = ollama_default_host, port = ollama_default_port){
+  require(httr2)
+
+  if(is.null(host) || host == "" || is.null(port) || port == ""){
+    return(list(success = FALSE, models = NULL, error = "No host/port provided"))
+  }
+
+  tryCatch({
+    url = paste0("http://", host, ":", port, "/api/tags")
+
+    response = request(url) %>%
+      req_timeout(10) %>%
+      req_perform()
+
+    result = response %>% resp_body_json()
+
+    if(length(result$models) == 0){
+      return(list(
+        success = FALSE,
+        models = NULL,
+        error = "No models found. Please install models using 'ollama pull <model-name>'"
+      ))
+    }
+
+    #extract model names
+    model_names = sapply(result$models, function(m) m$name)
+
+    return(list(
+      success = TRUE,
+      models = model_names,
+      error = NULL
+    ))
+
+  }, error = function(e){
+    return(list(
+      success = FALSE,
+      models = NULL,
+      error = paste("Could not connect to Ollama. Please check that Ollama is running and verify the host address and port are correct.")
+    ))
+  })
+}
+
+#fetch available models from OpenAI
+fetch_openai_models = function(api_key){
+  require(httr2)
+
+  if(is.null(api_key) || api_key == ""){
+    return(list(success = FALSE, models = NULL, error = "No API key provided"))
+  }
+
+  tryCatch({
+    response = request("https://api.openai.com/v1/models") %>%
+      req_headers(
+        "Authorization" = paste("Bearer", api_key)
+      ) %>%
+      req_timeout(15) %>%
+      req_perform()
+
+    result = response %>% resp_body_json()
+
+    #extract model IDs
+    all_models = sapply(result$data, function(m) m$id)
+
+    #filter for chat-compatible models (gpt-4*, gpt-3.5*, o1*, o3*, chatgpt*)
+    chat_models = all_models[grepl("^(gpt-4|gpt-3\\.5|o1|o3|chatgpt)", all_models, ignore.case = TRUE)]
+
+    #exclude deprecated/special variants
+    chat_models = chat_models[!grepl("(instruct|vision-preview|realtime|audio)", chat_models, ignore.case = TRUE)]
+
+    #sort alphabetically
+    chat_models = sort(chat_models, decreasing = TRUE)
+
+    if(length(chat_models) == 0){
+      return(list(
+        success = FALSE,
+        models = NULL,
+        error = "No chat-compatible models found for this API key."
+      ))
+    }
+
+    return(list(
+      success = TRUE,
+      models = chat_models,
+      error = NULL
+    ))
+
+  }, error = function(e){
+    return(list(
+      success = FALSE,
+      models = NULL,
+      error = "Could not fetch models from OpenAI. Please check that your API key is valid and that you have available credits."
+    ))
+  })
+}
+
+#fetch available models from Anthropic
+fetch_anthropic_models = function(api_key){
+  require(httr2)
+
+  if(is.null(api_key) || api_key == ""){
+    return(list(success = FALSE, models = NULL, error = "No API key provided"))
+  }
+
+  tryCatch({
+    response = request("https://api.anthropic.com/v1/models") %>%
+      req_headers(
+        "x-api-key" = api_key,
+        "anthropic-version" = "2023-06-01"
+      ) %>%
+      req_timeout(15) %>%
+      req_perform()
+
+    result = response %>% resp_body_json()
+
+    #extract model IDs
+    model_ids = sapply(result$data, function(m) m$id)
+
+    if(length(model_ids) == 0){
+      return(list(
+        success = FALSE,
+        models = NULL,
+        error = "No models found for this API key."
+      ))
+    }
+
+    return(list(
+      success = TRUE,
+      models = model_ids,
+      error = NULL
+    ))
+
+  }, error = function(e){
+    return(list(
+      success = FALSE,
+      models = NULL,
+      error = "Could not fetch models from Anthropic. Please check that your API key is valid and that you have available credits."
     ))
   })
 }

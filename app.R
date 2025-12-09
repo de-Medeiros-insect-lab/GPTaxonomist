@@ -119,7 +119,11 @@ server <- function(input, output) {
                       parseResponse = NULL,
                       completeResponse = NULL,
                       compareResponse = NULL,
-                      writeResponse = NULL
+                      writeResponse = NULL,
+                      #model lists for each provider
+                      openaiModels = NULL,
+                      anthropicModels = NULL,
+                      ollamaModels = NULL
                       )
 
   chatGPTlink = a("Go to chatGPT", href = "https://chat.openai.com", target = "_blank", class="btn btn-primary")
@@ -127,8 +131,47 @@ server <- function(input, output) {
 
 
   ######################## CONFIG server-side ###########################
-  #detect API keys on startup
-  observe({
+  #detect API keys on startup - run immediately and store result
+  rv$detectedKeys = detect_api_keys()
+
+  #helper reactive to get the effective Ollama model
+  getOllamaModel = reactive({
+    #if dropdown exists and is not custom, use it
+    if(!is.null(input$ollamaModelSelect) && input$ollamaModelSelect != "_custom_"){
+      return(input$ollamaModelSelect)
+    }
+    #otherwise use custom text input
+    if(!is.null(input$ollamaModelCustom) && input$ollamaModelCustom != ""){
+      return(input$ollamaModelCustom)
+    }
+    #fallback to default
+    return(ollama_default_model)
+  })
+
+  #helper reactive to get effective OpenAI API key
+  getOpenAIKey = reactive({
+    if(!is.null(input$openaiApiKey) && input$openaiApiKey != ""){
+      return(input$openaiApiKey)
+    }
+    if(!is.null(rv$detectedKeys$openai$value) && rv$detectedKeys$openai$value != ""){
+      return(rv$detectedKeys$openai$value)
+    }
+    return(NULL)
+  })
+
+  #helper reactive to get effective Anthropic API key
+  getAnthropicKey = reactive({
+    if(!is.null(input$anthropicApiKey) && input$anthropicApiKey != ""){
+      return(input$anthropicApiKey)
+    }
+    if(!is.null(rv$detectedKeys$anthropic$value) && rv$detectedKeys$anthropic$value != ""){
+      return(rv$detectedKeys$anthropic$value)
+    }
+    return(NULL)
+  })
+
+  #button to re-detect environment variables
+  observeEvent(input$refreshEnvKeys, {
     rv$detectedKeys = detect_api_keys()
   })
 
@@ -160,6 +203,159 @@ server <- function(input, output) {
     }
   })
 
+  #fetch OpenAI models when API key changes or refresh clicked
+  observe({
+    api_key = getOpenAIKey()
+    #also react to refresh button
+    input$refreshOpenaiModels
+
+    if(!is.null(api_key) && api_key != ""){
+      isolate({
+        rv$openaiModels = fetch_openai_models(api_key)
+      })
+    } else {
+      rv$openaiModels = NULL
+    }
+  })
+
+  #fetch Anthropic models when API key changes or refresh clicked
+  observe({
+    api_key = getAnthropicKey()
+    #also react to refresh button
+    input$refreshAnthropicModels
+
+    if(!is.null(api_key) && api_key != ""){
+      isolate({
+        rv$anthropicModels = fetch_anthropic_models(api_key)
+      })
+    } else {
+      rv$anthropicModels = NULL
+    }
+  })
+
+  #fetch Ollama models when host/port changes
+  observeEvent(c(input$ollamaHost, input$ollamaPort, input$refreshOllamaModels), {
+    req(input$ollamaHost, input$ollamaPort)
+    rv$ollamaModels = fetch_ollama_models(input$ollamaHost, input$ollamaPort)
+  }, ignoreNULL = FALSE)
+
+  #render OpenAI model selection UI
+  output$openaiModelUI = renderUI({
+    result = rv$openaiModels
+
+    if(is.null(result)){
+      return(NULL)
+    }
+
+    if(result$success){
+      tagList(
+        selectInput(
+          "openaiModel",
+          "Model:",
+          choices = result$models,
+          selected = if("gpt-4o-mini" %in% result$models) "gpt-4o-mini" else result$models[1]
+        ),
+        actionButton("refreshOpenaiModels", "Refresh models", icon = icon("sync"), class = "btn-sm")
+      )
+    } else {
+      tags$div(
+        style = "padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; margin-top: 10px;",
+        icon("exclamation-triangle"),
+        " ", result$error,
+        tags$br(),
+        actionButton("refreshOpenaiModels", "Retry", icon = icon("sync"), class = "btn-sm", style = "margin-top: 5px;")
+      )
+    }
+  })
+
+  #render Anthropic model selection UI
+  output$anthropicModelUI = renderUI({
+    result = rv$anthropicModels
+
+    if(is.null(result)){
+      return(NULL)
+    }
+
+    if(result$success){
+      tagList(
+        selectInput(
+          "anthropicModel",
+          "Model:",
+          choices = result$models,
+          selected = if("claude-3-5-haiku-20241022" %in% result$models) "claude-3-5-haiku-20241022" else result$models[1]
+        ),
+        actionButton("refreshAnthropicModels", "Refresh models", icon = icon("sync"), class = "btn-sm")
+      )
+    } else {
+      tags$div(
+        style = "padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; margin-top: 10px;",
+        icon("exclamation-triangle"),
+        " ", result$error,
+        tags$br(),
+        actionButton("refreshAnthropicModels", "Retry", icon = icon("sync"), class = "btn-sm", style = "margin-top: 5px;")
+      )
+    }
+  })
+
+  #render Ollama model selection UI
+  output$ollamaModelUI = renderUI({
+    result = rv$ollamaModels
+
+    #always show text input for custom model name, plus dropdown if models detected
+    if(is.null(result)){
+      return(tagList(
+        textInput("ollamaModelCustom", "Model name:", value = ollama_default_model,
+                  placeholder = "e.g., deepseek-r1:1.5b, llama3.2, mistral"),
+        tags$div(
+          style = "padding: 10px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px;",
+          icon("info-circle"),
+          " Click 'Refresh' to detect locally installed models, or type any model name above."
+        ),
+        actionButton("refreshOllamaModels", "Refresh local models", icon = icon("sync"), class = "btn-sm", style = "margin-top: 5px;")
+      ))
+    }
+
+    if(result$success){
+      #add custom option to the choices
+      model_choices = c("(custom)" = "_custom_", result$models)
+      default_selected = if(ollama_default_model %in% result$models) ollama_default_model else result$models[1]
+
+      tagList(
+        selectInput(
+          "ollamaModelSelect",
+          "Select installed model:",
+          choices = model_choices,
+          selected = default_selected
+        ),
+        conditionalPanel(
+          condition = "input.ollamaModelSelect == '_custom_'",
+          textInput("ollamaModelCustom", "Custom model name:", value = "",
+                    placeholder = "e.g., llama3.2, mistral, phi3")
+        ),
+        tags$small(
+          class = "text-muted",
+          "Only locally installed models are shown. Use ",
+          tags$code("ollama pull <model>"),
+          " to download new models, or select '(custom)' to enter any model name."
+        ),
+        actionButton("refreshOllamaModels", "Refresh", icon = icon("sync"), class = "btn-sm", style = "margin-top: 5px;")
+      )
+    } else {
+      tagList(
+        textInput("ollamaModelCustom", "Model name:", value = ollama_default_model,
+                  placeholder = "e.g., deepseek-r1:1.5b, llama3.2, mistral"),
+        tags$div(
+          style = "padding: 10px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; margin-top: 10px;",
+          icon("exclamation-triangle"),
+          " ", result$error,
+          tags$br(),
+          tags$small("You can still enter a model name manually above.")
+        ),
+        actionButton("refreshOllamaModels", "Retry", icon = icon("sync"), class = "btn-sm", style = "margin-top: 5px;")
+      )
+    }
+  })
+
   #display configuration status
   output$configStatus = renderUI({
     if(input$llmProvider == "none"){
@@ -169,17 +365,14 @@ server <- function(input, output) {
         " You are in copy-only mode. Generated prompts will include copy buttons and links to external LLM services."
       )
     } else if(input$llmProvider == "openai"){
-      api_key = if(!is.null(input$openaiApiKey) && input$openaiApiKey != ""){
-        input$openaiApiKey
-      } else {
-        rv$detectedKeys$openai$value
-      }
+      api_key = getOpenAIKey()
 
       if(!is.null(api_key) && api_key != ""){
+        model_name = if(!is.null(input$openaiModel)) input$openaiModel else "loading..."
         tags$div(
           style = "padding: 15px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;",
           icon("check-circle"),
-          " OpenAI API configured. You can run prompts directly in the application using model: gpt-4o-mini"
+          paste0(" OpenAI API configured. You can run prompts directly in the application using model: ", model_name)
         )
       } else {
         tags$div(
@@ -189,17 +382,14 @@ server <- function(input, output) {
         )
       }
     } else if(input$llmProvider == "anthropic"){
-      api_key = if(!is.null(input$anthropicApiKey) && input$anthropicApiKey != ""){
-        input$anthropicApiKey
-      } else {
-        rv$detectedKeys$anthropic$value
-      }
+      api_key = getAnthropicKey()
 
       if(!is.null(api_key) && api_key != ""){
+        model_name = if(!is.null(input$anthropicModel)) input$anthropicModel else "loading..."
         tags$div(
           style = "padding: 15px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;",
           icon("check-circle"),
-          " Anthropic API configured. You can run prompts directly in the application using model: claude-3-5-haiku-20241022"
+          paste0(" Anthropic API configured. You can run prompts directly in the application using model: ", model_name)
         )
       } else {
         tags$div(
@@ -209,10 +399,14 @@ server <- function(input, output) {
         )
       }
     } else if(input$llmProvider == "ollama"){
+      model_name = getOllamaModel()
+      if(is.null(model_name) || model_name == ""){
+        model_name = "not selected"
+      }
       tags$div(
         style = "padding: 15px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px;",
         icon("check-circle"),
-        paste0(" Ollama configured at ", input$ollamaHost, ":", input$ollamaPort, " using model: ", input$ollamaModel)
+        paste0(" Ollama configured at ", input$ollamaHost, ":", input$ollamaPort, " using model: ", model_name)
       )
     }
   })
@@ -297,25 +491,19 @@ server <- function(input, output) {
       result = NULL
 
       if(input$llmProvider == "openai"){
-        api_key = if(!is.null(input$openaiApiKey) && input$openaiApiKey != ""){
-          input$openaiApiKey
-        } else {
-          rv$detectedKeys$openai$value
-        }
-        result = call_openai(rv$parseOutputPrompt, api_key)
+        api_key = getOpenAIKey()
+        model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
+        result = call_openai(rv$parseOutputPrompt, api_key, model)
       } else if(input$llmProvider == "anthropic"){
-        api_key = if(!is.null(input$anthropicApiKey) && input$anthropicApiKey != ""){
-          input$anthropicApiKey
-        } else {
-          rv$detectedKeys$anthropic$value
-        }
-        result = call_anthropic(rv$parseOutputPrompt, api_key)
+        api_key = getAnthropicKey()
+        model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
+        result = call_anthropic(rv$parseOutputPrompt, api_key, model)
       } else if(input$llmProvider == "ollama"){
         result = call_ollama(
           rv$parseOutputPrompt,
           input$ollamaHost,
           input$ollamaPort,
-          input$ollamaModel
+          getOllamaModel()
         )
       }
 
@@ -456,25 +644,19 @@ server <- function(input, output) {
       result = NULL
 
       if(input$llmProvider == "openai"){
-        api_key = if(!is.null(input$openaiApiKey) && input$openaiApiKey != ""){
-          input$openaiApiKey
-        } else {
-          rv$detectedKeys$openai$value
-        }
-        result = call_openai(rv$completeOutputPrompt, api_key)
+        api_key = getOpenAIKey()
+        model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
+        result = call_openai(rv$completeOutputPrompt, api_key, model)
       } else if(input$llmProvider == "anthropic"){
-        api_key = if(!is.null(input$anthropicApiKey) && input$anthropicApiKey != ""){
-          input$anthropicApiKey
-        } else {
-          rv$detectedKeys$anthropic$value
-        }
-        result = call_anthropic(rv$completeOutputPrompt, api_key)
+        api_key = getAnthropicKey()
+        model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
+        result = call_anthropic(rv$completeOutputPrompt, api_key, model)
       } else if(input$llmProvider == "ollama"){
         result = call_ollama(
           rv$completeOutputPrompt,
           input$ollamaHost,
           input$ollamaPort,
-          input$ollamaModel
+          getOllamaModel()
         )
       }
 
@@ -596,25 +778,19 @@ server <- function(input, output) {
       result = NULL
 
       if(input$llmProvider == "openai"){
-        api_key = if(!is.null(input$openaiApiKey) && input$openaiApiKey != ""){
-          input$openaiApiKey
-        } else {
-          rv$detectedKeys$openai$value
-        }
-        result = call_openai(rv$compareOutputPrompt, api_key)
+        api_key = getOpenAIKey()
+        model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
+        result = call_openai(rv$compareOutputPrompt, api_key, model)
       } else if(input$llmProvider == "anthropic"){
-        api_key = if(!is.null(input$anthropicApiKey) && input$anthropicApiKey != ""){
-          input$anthropicApiKey
-        } else {
-          rv$detectedKeys$anthropic$value
-        }
-        result = call_anthropic(rv$compareOutputPrompt, api_key)
+        api_key = getAnthropicKey()
+        model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
+        result = call_anthropic(rv$compareOutputPrompt, api_key, model)
       } else if(input$llmProvider == "ollama"){
         result = call_ollama(
           rv$compareOutputPrompt,
           input$ollamaHost,
           input$ollamaPort,
-          input$ollamaModel
+          getOllamaModel()
         )
       }
 
@@ -756,25 +932,19 @@ server <- function(input, output) {
       result = NULL
 
       if(input$llmProvider == "openai"){
-        api_key = if(!is.null(input$openaiApiKey) && input$openaiApiKey != ""){
-          input$openaiApiKey
-        } else {
-          rv$detectedKeys$openai$value
-        }
-        result = call_openai(rv$writeOutputPrompt, api_key)
+        api_key = getOpenAIKey()
+        model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
+        result = call_openai(rv$writeOutputPrompt, api_key, model)
       } else if(input$llmProvider == "anthropic"){
-        api_key = if(!is.null(input$anthropicApiKey) && input$anthropicApiKey != ""){
-          input$anthropicApiKey
-        } else {
-          rv$detectedKeys$anthropic$value
-        }
-        result = call_anthropic(rv$writeOutputPrompt, api_key)
+        api_key = getAnthropicKey()
+        model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
+        result = call_anthropic(rv$writeOutputPrompt, api_key, model)
       } else if(input$llmProvider == "ollama"){
         result = call_ollama(
           rv$writeOutputPrompt,
           input$ollamaHost,
           input$ollamaPort,
-          input$ollamaModel
+          getOllamaModel()
         )
       }
 
@@ -840,10 +1010,6 @@ server <- function(input, output) {
   
   
 }
-
-###########TO DO
-########### SPLIT INPUT TABLE IF TOO LONG
-########### FIX UI
 
 # Run the application
 shinyApp(ui = ui, server = server)

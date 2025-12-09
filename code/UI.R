@@ -51,6 +51,12 @@ UI_config = tabItem(
     selected = "none"
   ),
 
+  tags$div(
+    style = "margin-bottom: 15px;",
+    actionButton("refreshEnvKeys", "Refresh environment variables", icon = icon("sync"), class = "btn-sm btn-secondary"),
+    tags$small(class = "text-muted", style = "margin-left: 10px;", "Click if API keys were set after starting the app")
+  ),
+
   conditionalPanel(
     condition = "input.llmProvider == 'openai'",
     h4("OpenAI API Configuration"),
@@ -59,7 +65,8 @@ UI_config = tabItem(
     p(),
     uiOutput("openaiKeyDetected"),
     passwordInput("openaiApiKey", "API Key:", placeholder = "sk-..."),
-    p(tags$small("Your API key is only stored in this session and is never saved."))
+    p(tags$small("Your API key is only stored in this session and is never saved.")),
+    uiOutput("openaiModelUI")
   ),
 
   conditionalPanel(
@@ -70,7 +77,8 @@ UI_config = tabItem(
     p(),
     uiOutput("anthropicKeyDetected"),
     passwordInput("anthropicApiKey", "API Key:", placeholder = "sk-ant-..."),
-    p(tags$small("Your API key is only stored in this session and is never saved."))
+    p(tags$small("Your API key is only stored in this session and is never saved.")),
+    uiOutput("anthropicModelUI")
   ),
 
   conditionalPanel(
@@ -84,8 +92,7 @@ UI_config = tabItem(
     p(),
     textInput("ollamaHost", "Host:", value = ollama_default_host),
     textInput("ollamaPort", "Port:", value = ollama_default_port),
-    textInput("ollamaModel", "Model name:", value = ollama_default_model,
-              placeholder = "e.g., deepseek-r1:1.5b, llama3.2, mistral"),
+    uiOutput("ollamaModelUI"),
     p(tags$small("Make sure Ollama is running on your system before using this option."))
   ),
 
