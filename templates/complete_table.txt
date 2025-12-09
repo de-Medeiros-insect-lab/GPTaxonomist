@@ -1,12 +1,12 @@
 FORMATTING INSTRUCTIONS:
 - If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
 - Wrap your final table output in <results></results> tags.
-- The content between <results></results> tags should contain ONLY the final markdown table, nothing else.
+- The content between <results></results> tags should contain ONLY the final ${OUTPUT_FORMAT}, nothing else.
 
 ---
 
 TASK:
-You are an expert taxonomist. Given a character table template and a natural language species description, populate the table with character states extracted from the description.
+You are an expert taxonomist. Given a character table template and a natural language species description, populate the table with character states extracted from the description. Your job is to include the species in the natural language description as a new column into the table template.
 
 TAXONOMIC DESCRIPTION:
 ```
@@ -20,7 +20,7 @@ ${TABLE}
 
 OUTPUT REQUIREMENTS:
 
-1. **Table Structure**: Produce a markdown pipe table with:
+1. **Output Format**: ${OUTPUT_FORMAT_INSTRUCTIONS} The table must have:
    - Column 1: Character names (identical to the template table, column 1)
    - Column 2: Observed states for the species in the description (name this column with the species name from the description)
    - Do NOT include column 2 from the template table

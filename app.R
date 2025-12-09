@@ -19,6 +19,7 @@ library(tibble)
 library(readxl)
 library(DT)
 library(httr2)
+library(jsonlite)
 
 #load functions first (needed for UI)
 source("./code/functions.R")
@@ -65,7 +66,11 @@ ui <- dashboardPage(
         tabName = "writeSpecimenList",
         icon = icon("map-location")
       ),
-      p("Bruno de Medeiros, 2023", align = "center"),
+      p(
+        "Bruno de Medeiros, 2023 ",
+        a(href = "https://github.com/de-Medeiros-insect-lab/GPTaxonomist", target = "_blank", icon("github")),
+        align = "center"
+      ),
       
       HTML(
         paste0(
@@ -241,11 +246,12 @@ server <- function(input, output) {
   ### Generating output
   #generate prompt
   observe({
-    req(rv$parseExampleDF, input$parseDesc, input$parseLanguage)
+    req(rv$parseExampleDF, input$parseDesc, input$parseLanguage, input$outputFormat)
     rv$parseOutputPrompt = fill_parseDescription(
       input$parseDesc,
       input$parseLanguage,
-      format_table(rv$parseExampleDF)
+      format_table_for_prompt(rv$parseExampleDF, input$outputFormat),
+      input$outputFormat
     )
   })
 
@@ -399,11 +405,12 @@ server <- function(input, output) {
 
   #generate prompt
   observe({
-    req(rv$completeTableDF, input$completeDesc, input$completeLanguage)
+    req(rv$completeTableDF, input$completeDesc, input$completeLanguage, input$outputFormat)
     rv$completeOutputPrompt = fill_completeTable(
       input$completeDesc,
       input$completeLanguage,
-      rv$completeTableDF
+      rv$completeTableDF,
+      input$outputFormat
     )
   })
 
@@ -537,12 +544,13 @@ server <- function(input, output) {
   ######################## COMPARE server-side ###########################
   #generate prompt
   observe({
-    req(input$compareDesc1, input$compareDesc2, input$compareLanguage)
+    req(input$compareDesc1, input$compareDesc2, input$compareLanguage, input$outputFormat)
     rv$compareOutputPrompt = fill_compareDescriptions(
       description1 = input$compareDesc1,
       description2 = input$compareDesc2,
       language = input$compareLanguage,
-      exclude_unique = input$compareSelectExclude
+      exclude_unique = input$compareSelectExclude,
+      output_format = input$outputFormat
     )
   })
 

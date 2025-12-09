@@ -20,6 +20,22 @@ UI_config = tabItem(
 
   hr(),
 
+  h3("Output Format"),
+  p("Choose the format for table outputs (Parse, Complete, and Compare modules):"),
+
+  radioButtons(
+    "outputFormat",
+    "Table Output Format:",
+    choices = list(
+      "CSV (comma-separated values)" = "csv",
+      "JSON (array of objects)" = "json",
+      "Markdown table" = "markdown"
+    ),
+    selected = "csv"
+  ),
+
+  hr(),
+
   h3("LLM Configuration"),
   p("Select how you want to use this application:"),
 
@@ -60,7 +76,7 @@ UI_config = tabItem(
   conditionalPanel(
     condition = "input.llmProvider == 'ollama'",
     h4("Ollama Configuration"),
-    p("Ollama allows you to run large language models locally on your computer."),
+    p("Ollama allows you to run large language models locally on your computer. This will only work if you are running GPTaxonomist at your computer and not through the shinyapps website."),
     a("Learn how to install Ollama", href = "https://ollama.com/download", target = "_blank"),
     p(),
     p("After installing Ollama, you can download models using:", tags$code("ollama pull <model-name>")),
@@ -85,7 +101,7 @@ UI_parse = tabItem(
   tabName = "parse",
   h2("Parse descriptions"),
   h3("Purpose"),
-  p("Generate a prompt to parse a taxonomic description in natural language into a table that can be copied and pasted"),
+  p("Generate a prompt to parse a taxonomic description in natural language into structured data (table or json)"),
   h3("Input required"),
   tags$div(
     tags$ul(
@@ -151,7 +167,7 @@ UI_complete = tabItem(
   tabName = "complete",
   h2("Complete table"),
   h3("Purpose"),
-  p("To generate a prompt to parse a taxonomic description in natural language and add characters to a pre-made table."),
+  p("Generate a prompt to parse a taxonomic description in natural language and add its character states to a pre-made table containing other species. No new characters will be added, only the states will be extracted."),
   h3("Input required"),
   tags$div(
     tags$ul(

@@ -1,7 +1,7 @@
 FORMATTING INSTRUCTIONS:
 - If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
 - Wrap your final table output in <results></results> tags.
-- The content between <results></results> tags should contain ONLY the final markdown table, nothing else.
+- The content between <results></results> tags should contain ONLY the final ${OUTPUT_FORMAT}, nothing else.
 
 ---
 
@@ -20,7 +20,7 @@ ${DESCRIPTION2}
 
 OUTPUT REQUIREMENTS:
 
-1. **Table Format**: Produce a markdown pipe table with three columns:
+1. **Output Format**: ${OUTPUT_FORMAT_INSTRUCTIONS} The table must have three columns:
    - Column 1: "Characters observed"
    - Column 2: Species name from description 1 (extract from text)
    - Column 3: Species name from description 2 (extract from text)
@@ -64,8 +64,6 @@ OUTPUT REQUIREMENTS:
    - If a character state is ambiguous or unclear, include your best interpretation
 
 EXAMPLE OUTPUT STRUCTURE:
-| Characters observed | Species A | Species B |
-|:---|:---|:---|
-| Adult male, head, vertex, color | black | reddish-brown |
-| Adult male, head, vertex, punctation | densely punctate | sparsely punctate |
-| Adult male, wing, fore wing, length (mm) | 4.2-4.8 | 3.8-4.1 |
+```
+${OUTPUT_FORMAT_EXAMPLE}
+```

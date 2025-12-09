@@ -1,7 +1,7 @@
 FORMATTING INSTRUCTIONS:
 - If you need to think through the problem or show your reasoning, wrap that content in <thinking></thinking> tags.
 - Wrap your final table output in <results></results> tags.
-- The content between <results></results> tags should contain ONLY the final markdown table, nothing else.
+- The content between <results></results> tags should contain ONLY the final ${OUTPUT_FORMAT}, nothing else.
 
 ---
 
@@ -15,7 +15,7 @@ ${DESCRIPTION}
 
 OUTPUT REQUIREMENTS:
 
-1. **Table Format**: Produce a markdown pipe table with two columns:
+1. **Output Format**: ${OUTPUT_FORMAT_INSTRUCTIONS} The table must have two columns:
    - Column 1: Character name
    - Column 2: Observed state
 
@@ -52,7 +52,7 @@ OUTPUT REQUIREMENTS:
    - If a state is implicit (e.g., "smooth" implies absence of punctation), extract it as stated
 
 EXAMPLE OUTPUT FORMAT:
-The following examples show the expected output structure. Your output should follow this format but contain only characters from the description above:
+The following examples show the expected output structure and naming conventions. Your output should follow this format but contain only characters from the description above:
 
 ```
 ${EXAMPLE}

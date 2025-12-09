@@ -31,10 +31,103 @@ format_table = function(df){
   f_table = knitr::kable(df, format = "pipe", escape = FALSE) %>%
     str_replace_all("\\|"," \\| ") %>%
     str_trim() %>%
-    str_replace_all(" +", " ") 
+    str_replace_all(" +", " ")
   f_table[2] = str_replace_all(f_table[2],"[:-]+",":-")
   f_table %>%
     paste0(collapse ="\n")
+}
+
+#format a CSV table (for prompt embedding)
+format_table_csv = function(df){
+  # Use a text connection to capture write.csv output
+  tc = textConnection("csv_output", "w", local = TRUE)
+  write.csv(df, tc, row.names = FALSE, quote = TRUE)
+  close(tc)
+  paste(csv_output, collapse = "\n")
+}
+
+#format a JSON array of objects (for prompt embedding)
+format_table_json = function(df){
+  jsonlite::toJSON(df, pretty = TRUE, auto_unbox = TRUE)
+}
+
+#get the human-readable format name
+get_format_name = function(format){
+  switch(format,
+         csv = "CSV (comma-separated values)",
+         json = "JSON array of objects",
+         markdown = "markdown pipe table",
+         "markdown pipe table"  # default
+  )
+}
+
+#format a table according to chosen output format
+format_table_for_prompt = function(df, format){
+  switch(format,
+         csv = format_table_csv(df),
+         json = format_table_json(df),
+         markdown = format_table(df),
+         format_table(df)  # default to markdown
+  )
+}
+
+#get format-specific output instructions for templates
+get_output_format_instructions = function(format){
+  switch(format,
+         csv = "Produce a CSV table with a header row followed by data rows. Use commas to separate values and quote fields containing commas or special characters.",
+         json = "Produce a JSON array where each element is an object representing one row. Use consistent key names matching the column headers.",
+         markdown = "Produce a markdown pipe table with headers separated by |. Include a separator row with :--- for left alignment.",
+         "Produce a markdown pipe table with headers separated by |."  # default
+  )
+}
+
+#get format-specific example for parse module
+get_parse_format_example = function(format){
+  switch(format,
+         csv = '"Character","State"
+"Adult male, head, color","black"
+"Adult male, head, punctation","densely punctate"
+"Adult male, wing, length (mm)","4.2-4.8"',
+         json = '[
+  {"Character": "Adult male, head, color", "State": "black"},
+  {"Character": "Adult male, head, punctation", "State": "densely punctate"},
+  {"Character": "Adult male, wing, length (mm)", "State": "4.2-4.8"}
+]',
+         markdown = '| Character | State |
+|:---|:---|
+| Adult male, head, color | black |
+| Adult male, head, punctation | densely punctate |
+| Adult male, wing, length (mm) | 4.2-4.8 |',
+         # default to markdown
+         '| Character | State |
+|:---|:---|
+| Adult male, head, color | black |
+| Adult male, head, punctation | densely punctate |'
+  )
+}
+
+#get format-specific example for compare module
+get_compare_format_example = function(format){
+  switch(format,
+         csv = '"Characters observed","Species A","Species B"
+"Adult male, head, vertex, color","black","reddish-brown"
+"Adult male, head, vertex, punctation","densely punctate","sparsely punctate"
+"Adult male, wing, fore wing, length (mm)","4.2-4.8","3.8-4.1"',
+         json = '[
+  {"Characters observed": "Adult male, head, vertex, color", "Species A": "black", "Species B": "reddish-brown"},
+  {"Characters observed": "Adult male, head, vertex, punctation", "Species A": "densely punctate", "Species B": "sparsely punctate"},
+  {"Characters observed": "Adult male, wing, fore wing, length (mm)", "Species A": "4.2-4.8", "Species B": "3.8-4.1"}
+]',
+         markdown = '| Characters observed | Species A | Species B |
+|:---|:---|:---|
+| Adult male, head, vertex, color | black | reddish-brown |
+| Adult male, head, vertex, punctation | densely punctate | sparsely punctate |
+| Adult male, wing, fore wing, length (mm) | 4.2-4.8 | 3.8-4.1 |',
+         # default to markdown
+         '| Characters observed | Species A | Species B |
+|:---|:---|:---|
+| Adult male, head, vertex, color | black | reddish-brown |'
+  )
 }
 
 
@@ -57,14 +150,16 @@ group_paragraphs = function(input, word_limit = parse_paragraph_word_limit){
 }
 
 #fills up PARSE DESCRIPTION template
-fill_parseDescription = function(description, language, example){
+fill_parseDescription = function(description, language, example, output_format = "csv"){
   template = read_file('templates/parse_description.txt')
-  
+
   return(template %>%
            str_replace_all('\\$\\{DESCRIPTION\\}', description) %>%
            str_replace_all('\\$\\{LANGUAGE\\}', language) %>%
-           str_replace_all('\\$\\{EXAMPLE\\}', example)
-           ) 
+           str_replace_all('\\$\\{EXAMPLE\\}', example) %>%
+           str_replace_all('\\$\\{OUTPUT_FORMAT\\}', get_format_name(output_format)) %>%
+           str_replace_all('\\$\\{OUTPUT_FORMAT_INSTRUCTIONS\\}', get_output_format_instructions(output_format))
+           )
 }
 
 #returns table rows in groups containing at most complete_table_word_limit
@@ -84,34 +179,39 @@ group_table_rows = function(input_table, word_limit = complete_table_word_limit)
 }
 
 #fills up COMPLETE TABLE template
-fill_completeTable = function(description, language, table1){
+fill_completeTable = function(description, language, table1, output_format = "csv"){
   template = read_file('templates/complete_table.txt')
-  out_table_text = format_table(table1)
-  
-  
+  out_table_text = format_table_for_prompt(table1, output_format)
+
+
   return(template %>%
            str_replace_all('\\$\\{DESCRIPTION\\}', description) %>%
            str_replace_all('\\$\\{LANGUAGE\\}', language) %>%
-           str_replace_all('\\$\\{TABLE\\}', out_table_text)
-  ) 
+           str_replace_all('\\$\\{TABLE\\}', out_table_text) %>%
+           str_replace_all('\\$\\{OUTPUT_FORMAT\\}', get_format_name(output_format)) %>%
+           str_replace_all('\\$\\{OUTPUT_FORMAT_INSTRUCTIONS\\}', get_output_format_instructions(output_format))
+  )
 }
 
 #fills up a COMPARE DESCRIPTIONS template
-fill_compareDescriptions = function(description1, description2, language, exclude_unique){
+fill_compareDescriptions = function(description1, description2, language, exclude_unique, output_format = "csv"){
   template = read_file('templates/compare_description.txt')
-  
+
   if (exclude_unique){
     unique_statement = "Only include characters observed in both species descriptions (skip row if one is missing or not observed). "
   } else {
     unique_statement = "Include all characters, fill up with NA if not observed for a species. "
   }
-  
+
   return(template %>%
            str_replace_all('\\$\\{DESCRIPTION1\\}', description1) %>%
            str_replace_all('\\$\\{DESCRIPTION2\\}', description2) %>%
            str_replace_all('\\$\\{LANGUAGE\\}', language) %>%
-           str_replace_all('\\$\\{INCLUDE_STATEMENT\\}', unique_statement)
-  ) 
+           str_replace_all('\\$\\{INCLUDE_STATEMENT\\}', unique_statement) %>%
+           str_replace_all('\\$\\{OUTPUT_FORMAT\\}', get_format_name(output_format)) %>%
+           str_replace_all('\\$\\{OUTPUT_FORMAT_INSTRUCTIONS\\}', get_output_format_instructions(output_format)) %>%
+           str_replace_all('\\$\\{OUTPUT_FORMAT_EXAMPLE\\}', get_compare_format_example(output_format))
+  )
 }
 
 

@@ -26,12 +26,14 @@ OUTPUT REQUIREMENTS:
    - Use terse, precise phrasing: "punctate" not "covered with punctures"
    - Employ standard taxonomic terminology and abbreviations
    - Example: "Body elongate, black; head sparsely punctate; antennae filiform, 11-segmented."
+   - Use paragraph structure and punctuation as in the template. Often, major body areas will be in separate paragraphs, minor body areas as sentences, and specific structures are separated by semi-colons, with different traits for each specific structure separated by comma. You may need some flexibility to produce readable text.
 
 2. **Template Adherence**:
    - Follow the template's organizational structure (paragraph breaks, section order)
    - Follow the template's punctuation style (semicolons, commas, periods)
    - Follow the template's character sequence
    - Match the template's level of detail and phrasing patterns
+   - Prioritize following the template structure over general ideas on taxonomic writing style.
 
 3. **Character States from Table**:
    - Use observed states ONLY from the character table
@@ -44,8 +46,8 @@ OUTPUT REQUIREMENTS:
    - Adjust punctuation smoothly when omitting characters (e.g., if skipping a semicolon-separated phrase)
 
 5. **Handling Extra Characters**:
-   - If a character exists in the table but not in the template, do NOT include it in the description
-   - Note these extra characters in your <thinking> tags as warnings: "Warning: Character '[name]' from table not found in template"
+   - If a character exists in the table but not in the template, include it in the description in the most appropriate place.
+   - Note these extra characters in your <thinking> tags as warnings: "Warning: Character '[name]' from table not found in template, placed after character '[name_2]'"
 
 6. **Character Order**:
    - Maintain the template's character sequence
