@@ -563,3 +563,198 @@ call_ollama = function(prompt, host = ollama_default_host, port = ollama_default
   })
 }
 
+################## STREAMING API FUNCTIONS ##################
+# These functions stream responses to a file for real-time UI updates
+
+#stream OpenAI response to file (for use in background process)
+stream_openai_to_file = function(prompt, api_key, model, output_file, status_file) {
+  require(httr2)
+  require(jsonlite)
+
+  if(is.null(api_key) || api_key == ""){
+    cat("error:No API key provided", file = status_file)
+    return(invisible(NULL))
+  }
+
+  accumulated = ""
+  buffer = ""  # Buffer for incomplete SSE lines
+
+  tryCatch({
+    cat("running", file = status_file)
+    cat("", file = output_file)
+
+    request("https://api.openai.com/v1/chat/completions") %>%
+      req_headers(
+        "Authorization" = paste("Bearer", api_key),
+        "Content-Type" = "application/json"
+      ) %>%
+      req_body_json(list(
+        model = model,
+        messages = list(list(role = "user", content = prompt)),
+        stream = TRUE
+      )) %>%
+      req_timeout(300) %>%
+      req_perform_stream(callback = function(chunk) {
+        data = rawToChar(chunk)
+        buffer <<- paste0(buffer, data)
+
+        # Process complete lines only
+        while(grepl("\n", buffer)) {
+          newline_pos = regexpr("\n", buffer)[1]
+          line = substr(buffer, 1, newline_pos - 1)
+          buffer <<- substr(buffer, newline_pos + 1, nchar(buffer))
+
+          if(startsWith(line, "data: ") && line != "data: [DONE]") {
+            json_str = substring(line, 7)
+            parsed = tryCatch(fromJSON(json_str, simplifyVector = FALSE), error = function(e) NULL)
+            if(!is.null(parsed) &&
+               !is.null(parsed$choices) &&
+               length(parsed$choices) > 0 &&
+               !is.null(parsed$choices[[1]]$delta) &&
+               !is.null(parsed$choices[[1]]$delta$content)) {
+              content = parsed$choices[[1]]$delta$content
+              accumulated <<- paste0(accumulated, content)
+              cat(accumulated, file = output_file)
+            }
+          }
+        }
+        TRUE
+      }, buffer_kb = 0.1)
+
+    cat("success", file = status_file)
+
+  }, error = function(e){
+    cat(paste0("error:", e$message), file = status_file)
+  })
+
+  return(invisible(NULL))
+}
+
+#stream Anthropic response to file (for use in background process)
+stream_anthropic_to_file = function(prompt, api_key, model, output_file, status_file) {
+  require(httr2)
+  require(jsonlite)
+
+  if(is.null(api_key) || api_key == ""){
+    cat("error:No API key provided", file = status_file)
+    return(invisible(NULL))
+  }
+
+  accumulated = ""
+  buffer = ""  # Buffer for incomplete SSE lines
+
+  tryCatch({
+    cat("running", file = status_file)
+    cat("", file = output_file)
+
+    request("https://api.anthropic.com/v1/messages") %>%
+      req_headers(
+        "x-api-key" = api_key,
+        "anthropic-version" = "2023-06-01",
+        "Content-Type" = "application/json"
+      ) %>%
+      req_body_json(list(
+        model = model,
+        max_tokens = 4096,
+        messages = list(list(role = "user", content = prompt)),
+        stream = TRUE
+      )) %>%
+      req_timeout(300) %>%
+      req_perform_stream(callback = function(chunk) {
+        data = rawToChar(chunk)
+        buffer <<- paste0(buffer, data)
+
+        # Process complete lines only
+        while(grepl("\n", buffer)) {
+          newline_pos = regexpr("\n", buffer)[1]
+          line = substr(buffer, 1, newline_pos - 1)
+          buffer <<- substr(buffer, newline_pos + 1, nchar(buffer))
+
+          if(startsWith(line, "data: ")) {
+            json_str = substring(line, 7)
+            parsed = tryCatch(fromJSON(json_str, simplifyVector = FALSE), error = function(e) NULL)
+            if(!is.null(parsed) && !is.null(parsed$type) && parsed$type == "content_block_delta") {
+              if(!is.null(parsed$delta) && !is.null(parsed$delta$text)) {
+                content = parsed$delta$text
+                accumulated <<- paste0(accumulated, content)
+                cat(accumulated, file = output_file)
+              }
+            }
+          }
+        }
+        TRUE
+      }, buffer_kb = 0.1)
+
+    cat("success", file = status_file)
+
+  }, error = function(e){
+    cat(paste0("error:", e$message), file = status_file)
+  })
+
+  return(invisible(NULL))
+}
+
+#stream Ollama response to file (for use in background process)
+stream_ollama_to_file = function(prompt, host, port, model, output_file, status_file) {
+  require(httr2)
+  require(jsonlite)
+
+  if(is.null(host) || host == "" || is.null(port) || port == ""){
+    cat("error:No Ollama host/port provided", file = status_file)
+    return(invisible(NULL))
+  }
+
+  if(is.null(model) || model == ""){
+    cat("error:No Ollama model specified", file = status_file)
+    return(invisible(NULL))
+  }
+
+  accumulated = ""
+  buffer = ""  # Buffer for incomplete JSON lines
+
+  tryCatch({
+    cat("running", file = status_file)
+    cat("", file = output_file)
+
+    url = paste0("http://", host, ":", port, "/api/generate")
+
+    request(url) %>%
+      req_headers(
+        "Content-Type" = "application/json"
+      ) %>%
+      req_body_json(list(
+        model = model,
+        prompt = prompt,
+        stream = TRUE
+      )) %>%
+      req_timeout(300) %>%
+      req_perform_stream(callback = function(chunk) {
+        data = rawToChar(chunk)
+        buffer <<- paste0(buffer, data)
+
+        # Process complete lines only
+        while(grepl("\n", buffer)) {
+          newline_pos = regexpr("\n", buffer)[1]
+          line = substr(buffer, 1, newline_pos - 1)
+          buffer <<- substr(buffer, newline_pos + 1, nchar(buffer))
+
+          if(nchar(trimws(line)) > 0) {
+            parsed = tryCatch(fromJSON(line, simplifyVector = FALSE), error = function(e) NULL)
+            if(!is.null(parsed) && !is.null(parsed$response)) {
+              accumulated <<- paste0(accumulated, parsed$response)
+              cat(accumulated, file = output_file)
+            }
+          }
+        }
+        TRUE
+      }, buffer_kb = 0.1)
+
+    cat("success", file = status_file)
+
+  }, error = function(e){
+    cat(paste0("error:", e$message), file = status_file)
+  })
+
+  return(invisible(NULL))
+}
+

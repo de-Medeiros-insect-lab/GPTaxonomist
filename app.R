@@ -9,6 +9,7 @@
 
 library(shiny)
 library(shinydashboard)
+library(shinyjs)
 library(rclipboard)
 library(dplyr)
 library(readr)
@@ -20,6 +21,7 @@ library(readxl)
 library(DT)
 library(httr2)
 library(jsonlite)
+library(callr)
 
 #load functions first (needed for UI)
 source("./code/functions.R")
@@ -83,13 +85,50 @@ ui <- dashboardPage(
   ),
   
   dashboardBody(
-    tags$head(tags$style(HTML(
-      "
+    useShinyjs(),
+    tags$head(
+      tags$style(HTML(
+        "
         .my-margin {
           margin-left: 10px;
         }
-      "
-    ))),
+        .streaming-output {
+          white-space: pre-wrap;
+          max-height: 500px;
+          overflow-y: auto;
+          margin-top: 10px;
+        }
+        "
+      )),
+      tags$script(HTML("
+        // Store scroll positions for streaming outputs
+        var streamScrollPositions = {};
+        var streamUserScrolled = {};
+
+        // Function to check if user has scrolled up from bottom
+        function isScrolledToBottom(el) {
+          return el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+        }
+
+        // Function to update streaming content while preserving scroll
+        Shiny.addCustomMessageHandler('updateStreamContent', function(message) {
+          var el = document.getElementById(message.id);
+          if (el) {
+            var wasAtBottom = isScrolledToBottom(el);
+            var oldScrollTop = el.scrollTop;
+
+            el.textContent = message.content;
+
+            // If user was at bottom, scroll to new bottom; otherwise preserve position
+            if (wasAtBottom) {
+              el.scrollTop = el.scrollHeight;
+            } else {
+              el.scrollTop = oldScrollTop;
+            }
+          }
+        });
+      "))
+    ),
     tabItems(
       UI_config,
       UI_parse,
@@ -110,7 +149,7 @@ ui <- dashboardPage(
 
 
 # Server computations
-server <- function(input, output) {
+server <- function(input, output, session) {
   #initialize reactive values
   rv = reactiveValues(parseExamplePath = "defaults/parse/example.csv",
                       completeTablePath = "defaults/complete/table.csv",
@@ -123,7 +162,12 @@ server <- function(input, output) {
                       #model lists for each provider
                       openaiModels = NULL,
                       anthropicModels = NULL,
-                      ollamaModels = NULL
+                      ollamaModels = NULL,
+                      #streaming state for each module
+                      parseStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL),
+                      completeStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL),
+                      compareStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL),
+                      writeStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL)
                       )
 
   chatGPTlink = a("Go to chatGPT", href = "https://chat.openai.com", target = "_blank", class="btn btn-primary")
@@ -482,59 +526,163 @@ server <- function(input, output) {
   })
 
 
-  #handle Run Prompt button
+  #helper function to get app directory for background processes
+  appDir = getwd()
+
+  #wrapper function for background streaming that sources our functions
+  runStreamingBg = function(provider, prompt, output_file, status_file, app_dir, ...) {
+    setwd(app_dir)
+    source("./code/functions.R")
+    args = list(...)
+    if(provider == "openai"){
+      stream_openai_to_file(prompt, args$api_key, args$model, output_file, status_file)
+    } else if(provider == "anthropic"){
+      stream_anthropic_to_file(prompt, args$api_key, args$model, output_file, status_file)
+    } else if(provider == "ollama"){
+      stream_ollama_to_file(prompt, args$host, args$port, args$model, output_file, status_file)
+    }
+  }
+
+  #handle Run Prompt button - start streaming in background
   observeEvent(input$parseRunPrompt, {
-    withProgress(message = 'Running prompt...', value = 0, {
+    #create temp files for streaming
+    outputFile = tempfile(pattern = "stream_output_", fileext = ".txt")
+    statusFile = tempfile(pattern = "stream_status_", fileext = ".txt")
+    cat("starting", file = statusFile)
+    cat("", file = outputFile)
 
-      #get API key based on provider
-      api_key = NULL
-      result = NULL
+    #clear previous result
+    rv$parseResult = NULL
 
-      if(input$llmProvider == "openai"){
-        api_key = getOpenAIKey()
-        model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
-        result = call_openai(rv$parseOutputPrompt, api_key, model)
-      } else if(input$llmProvider == "anthropic"){
-        api_key = getAnthropicKey()
-        model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
-        result = call_anthropic(rv$parseOutputPrompt, api_key, model)
-      } else if(input$llmProvider == "ollama"){
-        result = call_ollama(
-          rv$parseOutputPrompt,
-          input$ollamaHost,
-          input$ollamaPort,
-          getOllamaModel()
+    #get parameters based on provider
+    if(input$llmProvider == "openai"){
+      api_key = getOpenAIKey()
+      model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
+      rv$parseStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "openai",
+            prompt = rv$parseOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            api_key = api_key,
+            model = model
+          ),
+          package = TRUE
         )
-      }
-
-      #store result
-      rv$parseResult = result
-    })
+      )
+    } else if(input$llmProvider == "anthropic"){
+      api_key = getAnthropicKey()
+      model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
+      rv$parseStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "anthropic",
+            prompt = rv$parseOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            api_key = api_key,
+            model = model
+          ),
+          package = TRUE
+        )
+      )
+    } else if(input$llmProvider == "ollama"){
+      rv$parseStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "ollama",
+            prompt = rv$parseOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            host = input$ollamaHost,
+            port = input$ollamaPort,
+            model = getOllamaModel()
+          ),
+          package = TRUE
+        )
+      )
+    }
   })
 
-  #render raw response
-  output$parseRawResponse <- renderUI({
-    result = rv$parseResult
-    if(is.null(result)){
-      return(NULL)
-    }
+  #observer for parse streaming updates (polls without triggering UI rebuild)
+  observe({
+    streaming = rv$parseStreaming
+    if(streaming$active && !is.null(streaming$statusFile) && file.exists(streaming$statusFile)){
+      status = tryCatch(readLines(streaming$statusFile, warn = FALSE)[1], error = function(e) "")
+      content = tryCatch(
+        paste(readLines(streaming$outputFile, warn = FALSE), collapse = "\n"),
+        error = function(e) ""
+      )
 
-    if(result$success){
-      tags$div(
-        rclipButton(
-          "parseRawResponseClip",
-          "Copy raw response",
-          result$content,
-          icon = icon("copy")
+      if(status == "running" || status == "starting"){
+        #update content via JavaScript to preserve scroll position
+        session$sendCustomMessage("updateStreamContent", list(
+          id = "parseStreamingContent",
+          content = content
+        ))
+        invalidateLater(200)  #poll every 200ms
+      } else if(status == "success"){
+        #streaming completed successfully
+        rv$parseResult = list(success = TRUE, content = content)
+        rv$parseStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL)
+      } else if(startsWith(status, "error:")){
+        #streaming encountered an error
+        rv$parseResult = list(success = FALSE, error = substring(status, 7))
+        rv$parseStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL)
+      }
+    }
+  })
+
+  #render raw response UI (only rebuilds when streaming state or result changes)
+  output$parseRawResponse <- renderUI({
+    streaming = rv$parseStreaming
+    result = rv$parseResult
+
+    if(streaming$active){
+      #render streaming UI once - content updated via JS observer above
+      tagList(
+        tags$div(
+          style = "padding: 10px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; margin-bottom: 10px;",
+          icon("spinner", class = "fa-spin"),
+          " Receiving response..."
         ),
-        tags$pre(style = "white-space: pre-wrap; margin-top: 10px;", result$content)
+        tags$pre(id = "parseStreamingContent", class = "streaming-output", "")
       )
-    } else {
-      tags$div(
-        style = "padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;",
-        icon("exclamation-circle"),
-        " Error: ", result$error
-      )
+    } else if(!is.null(result)){
+      #show final result
+      if(result$success){
+        tags$div(
+          rclipButton(
+            "parseRawResponseClip",
+            "Copy raw response",
+            result$content,
+            icon = icon("copy")
+          ),
+          tags$pre(class = "streaming-output", style = "margin-top: 10px;", result$content)
+        )
+      } else {
+        tags$div(
+          style = "padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;",
+          icon("exclamation-circle"),
+          " Error: ", result$error
+        )
+      }
     }
   })
 
@@ -635,59 +783,146 @@ server <- function(input, output) {
   })
 
 
-  #handle Run Prompt button
+  #handle Run Prompt button - start streaming in background
   observeEvent(input$completeRunPrompt, {
-    withProgress(message = 'Running prompt...', value = 0, {
+    #create temp files for streaming
+    outputFile = tempfile(pattern = "stream_output_", fileext = ".txt")
+    statusFile = tempfile(pattern = "stream_status_", fileext = ".txt")
+    cat("starting", file = statusFile)
+    cat("", file = outputFile)
 
-      #get API key based on provider
-      api_key = NULL
-      result = NULL
+    #clear previous result
+    rv$completeResult = NULL
 
-      if(input$llmProvider == "openai"){
-        api_key = getOpenAIKey()
-        model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
-        result = call_openai(rv$completeOutputPrompt, api_key, model)
-      } else if(input$llmProvider == "anthropic"){
-        api_key = getAnthropicKey()
-        model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
-        result = call_anthropic(rv$completeOutputPrompt, api_key, model)
-      } else if(input$llmProvider == "ollama"){
-        result = call_ollama(
-          rv$completeOutputPrompt,
-          input$ollamaHost,
-          input$ollamaPort,
-          getOllamaModel()
+    #get parameters based on provider
+    if(input$llmProvider == "openai"){
+      api_key = getOpenAIKey()
+      model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
+      rv$completeStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "openai",
+            prompt = rv$completeOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            api_key = api_key,
+            model = model
+          ),
+          package = TRUE
         )
-      }
-
-      #store result
-      rv$completeResult = result
-    })
+      )
+    } else if(input$llmProvider == "anthropic"){
+      api_key = getAnthropicKey()
+      model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
+      rv$completeStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "anthropic",
+            prompt = rv$completeOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            api_key = api_key,
+            model = model
+          ),
+          package = TRUE
+        )
+      )
+    } else if(input$llmProvider == "ollama"){
+      rv$completeStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "ollama",
+            prompt = rv$completeOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            host = input$ollamaHost,
+            port = input$ollamaPort,
+            model = getOllamaModel()
+          ),
+          package = TRUE
+        )
+      )
+    }
   })
 
-  #render raw response
-  output$completeRawResponse <- renderUI({
-    result = rv$completeResult
-    if(is.null(result)){
-      return(NULL)
-    }
+  #observer for complete streaming updates (polls without triggering UI rebuild)
+  observe({
+    streaming = rv$completeStreaming
+    if(streaming$active && !is.null(streaming$statusFile) && file.exists(streaming$statusFile)){
+      status = tryCatch(readLines(streaming$statusFile, warn = FALSE)[1], error = function(e) "")
+      content = tryCatch(
+        paste(readLines(streaming$outputFile, warn = FALSE), collapse = "\n"),
+        error = function(e) ""
+      )
 
-    if(result$success){
-      tags$div(
-        rclipButton(
-          "completeRawResponseClip",
-          "Copy raw response",
-          result$content,
-          icon = icon("copy")
+      if(status == "running" || status == "starting"){
+        #update content via JavaScript to preserve scroll position
+        session$sendCustomMessage("updateStreamContent", list(
+          id = "completeStreamingContent",
+          content = content
+        ))
+        invalidateLater(200)  #poll every 200ms
+      } else if(status == "success"){
+        #streaming completed successfully
+        rv$completeResult = list(success = TRUE, content = content)
+        rv$completeStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL)
+      } else if(startsWith(status, "error:")){
+        #streaming encountered an error
+        rv$completeResult = list(success = FALSE, error = substring(status, 7))
+        rv$completeStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL)
+      }
+    }
+  })
+
+  #render raw response UI (only rebuilds when streaming state or result changes)
+  output$completeRawResponse <- renderUI({
+    streaming = rv$completeStreaming
+    result = rv$completeResult
+
+    if(streaming$active){
+      #render streaming UI once - content updated via JS observer above
+      tagList(
+        tags$div(
+          style = "padding: 10px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; margin-bottom: 10px;",
+          icon("spinner", class = "fa-spin"),
+          " Receiving response..."
         ),
-        tags$pre(style = "white-space: pre-wrap; margin-top: 10px;", result$content)
+        tags$pre(id = "completeStreamingContent", class = "streaming-output", "")
       )
-    } else {
-      tags$div(
-        style = "padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;",
-        icon("exclamation-circle"),
-        " Error: ", result$error
-      )
+    } else if(!is.null(result)){
+      #show final result
+      if(result$success){
+        tags$div(
+          rclipButton(
+            "completeRawResponseClip",
+            "Copy raw response",
+            result$content,
+            icon = icon("copy")
+          ),
+          tags$pre(class = "streaming-output", style = "margin-top: 10px;", result$content)
+        )
+      } else {
+        tags$div(
+          style = "padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;",
+          icon("exclamation-circle"),
+          " Error: ", result$error
+        )
+      }
     }
   })
 
@@ -769,59 +1004,146 @@ server <- function(input, output) {
   })
 
 
-  #handle Run Prompt button for Compare
+  #handle Run Prompt button for Compare - start streaming in background
   observeEvent(input$compareRunPrompt, {
-    withProgress(message = 'Running prompt...', value = 0, {
+    #create temp files for streaming
+    outputFile = tempfile(pattern = "stream_output_", fileext = ".txt")
+    statusFile = tempfile(pattern = "stream_status_", fileext = ".txt")
+    cat("starting", file = statusFile)
+    cat("", file = outputFile)
 
-      #get API key based on provider
-      api_key = NULL
-      result = NULL
+    #clear previous result
+    rv$compareResult = NULL
 
-      if(input$llmProvider == "openai"){
-        api_key = getOpenAIKey()
-        model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
-        result = call_openai(rv$compareOutputPrompt, api_key, model)
-      } else if(input$llmProvider == "anthropic"){
-        api_key = getAnthropicKey()
-        model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
-        result = call_anthropic(rv$compareOutputPrompt, api_key, model)
-      } else if(input$llmProvider == "ollama"){
-        result = call_ollama(
-          rv$compareOutputPrompt,
-          input$ollamaHost,
-          input$ollamaPort,
-          getOllamaModel()
+    #get parameters based on provider
+    if(input$llmProvider == "openai"){
+      api_key = getOpenAIKey()
+      model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
+      rv$compareStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "openai",
+            prompt = rv$compareOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            api_key = api_key,
+            model = model
+          ),
+          package = TRUE
         )
-      }
-
-      #store result
-      rv$compareResult = result
-    })
+      )
+    } else if(input$llmProvider == "anthropic"){
+      api_key = getAnthropicKey()
+      model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
+      rv$compareStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "anthropic",
+            prompt = rv$compareOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            api_key = api_key,
+            model = model
+          ),
+          package = TRUE
+        )
+      )
+    } else if(input$llmProvider == "ollama"){
+      rv$compareStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "ollama",
+            prompt = rv$compareOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            host = input$ollamaHost,
+            port = input$ollamaPort,
+            model = getOllamaModel()
+          ),
+          package = TRUE
+        )
+      )
+    }
   })
 
-  #render raw response for Compare
-  output$compareRawResponse <- renderUI({
-    result = rv$compareResult
-    if(is.null(result)){
-      return(NULL)
-    }
+  #observer for compare streaming updates (polls without triggering UI rebuild)
+  observe({
+    streaming = rv$compareStreaming
+    if(streaming$active && !is.null(streaming$statusFile) && file.exists(streaming$statusFile)){
+      status = tryCatch(readLines(streaming$statusFile, warn = FALSE)[1], error = function(e) "")
+      content = tryCatch(
+        paste(readLines(streaming$outputFile, warn = FALSE), collapse = "\n"),
+        error = function(e) ""
+      )
 
-    if(result$success){
-      tags$div(
-        rclipButton(
-          "compareRawResponseClip",
-          "Copy raw response",
-          result$content,
-          icon = icon("copy")
+      if(status == "running" || status == "starting"){
+        #update content via JavaScript to preserve scroll position
+        session$sendCustomMessage("updateStreamContent", list(
+          id = "compareStreamingContent",
+          content = content
+        ))
+        invalidateLater(200)  #poll every 200ms
+      } else if(status == "success"){
+        #streaming completed successfully
+        rv$compareResult = list(success = TRUE, content = content)
+        rv$compareStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL)
+      } else if(startsWith(status, "error:")){
+        #streaming encountered an error
+        rv$compareResult = list(success = FALSE, error = substring(status, 7))
+        rv$compareStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL)
+      }
+    }
+  })
+
+  #render raw response UI for Compare (only rebuilds when streaming state or result changes)
+  output$compareRawResponse <- renderUI({
+    streaming = rv$compareStreaming
+    result = rv$compareResult
+
+    if(streaming$active){
+      #render streaming UI once - content updated via JS observer above
+      tagList(
+        tags$div(
+          style = "padding: 10px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; margin-bottom: 10px;",
+          icon("spinner", class = "fa-spin"),
+          " Receiving response..."
         ),
-        tags$pre(style = "white-space: pre-wrap; margin-top: 10px;", result$content)
+        tags$pre(id = "compareStreamingContent", class = "streaming-output", "")
       )
-    } else {
-      tags$div(
-        style = "padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;",
-        icon("exclamation-circle"),
-        " Error: ", result$error
-      )
+    } else if(!is.null(result)){
+      #show final result
+      if(result$success){
+        tags$div(
+          rclipButton(
+            "compareRawResponseClip",
+            "Copy raw response",
+            result$content,
+            icon = icon("copy")
+          ),
+          tags$pre(class = "streaming-output", style = "margin-top: 10px;", result$content)
+        )
+      } else {
+        tags$div(
+          style = "padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;",
+          icon("exclamation-circle"),
+          " Error: ", result$error
+        )
+      }
     }
   })
 
@@ -923,59 +1245,146 @@ server <- function(input, output) {
   })
 
 
-  #handle Run Prompt button for Write
+  #handle Run Prompt button for Write - start streaming in background
   observeEvent(input$writeRunPrompt, {
-    withProgress(message = 'Running prompt...', value = 0, {
+    #create temp files for streaming
+    outputFile = tempfile(pattern = "stream_output_", fileext = ".txt")
+    statusFile = tempfile(pattern = "stream_status_", fileext = ".txt")
+    cat("starting", file = statusFile)
+    cat("", file = outputFile)
 
-      #get API key based on provider
-      api_key = NULL
-      result = NULL
+    #clear previous result
+    rv$writeResult = NULL
 
-      if(input$llmProvider == "openai"){
-        api_key = getOpenAIKey()
-        model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
-        result = call_openai(rv$writeOutputPrompt, api_key, model)
-      } else if(input$llmProvider == "anthropic"){
-        api_key = getAnthropicKey()
-        model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
-        result = call_anthropic(rv$writeOutputPrompt, api_key, model)
-      } else if(input$llmProvider == "ollama"){
-        result = call_ollama(
-          rv$writeOutputPrompt,
-          input$ollamaHost,
-          input$ollamaPort,
-          getOllamaModel()
+    #get parameters based on provider
+    if(input$llmProvider == "openai"){
+      api_key = getOpenAIKey()
+      model = if(!is.null(input$openaiModel)) input$openaiModel else "gpt-4o-mini"
+      rv$writeStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "openai",
+            prompt = rv$writeOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            api_key = api_key,
+            model = model
+          ),
+          package = TRUE
         )
-      }
-
-      #store result
-      rv$writeResult = result
-    })
+      )
+    } else if(input$llmProvider == "anthropic"){
+      api_key = getAnthropicKey()
+      model = if(!is.null(input$anthropicModel)) input$anthropicModel else "claude-3-5-haiku-20241022"
+      rv$writeStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "anthropic",
+            prompt = rv$writeOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            api_key = api_key,
+            model = model
+          ),
+          package = TRUE
+        )
+      )
+    } else if(input$llmProvider == "ollama"){
+      rv$writeStreaming = list(
+        active = TRUE,
+        outputFile = outputFile,
+        statusFile = statusFile,
+        process = r_bg(
+          runStreamingBg,
+          args = list(
+            provider = "ollama",
+            prompt = rv$writeOutputPrompt,
+            output_file = outputFile,
+            status_file = statusFile,
+            app_dir = appDir,
+            host = input$ollamaHost,
+            port = input$ollamaPort,
+            model = getOllamaModel()
+          ),
+          package = TRUE
+        )
+      )
+    }
   })
 
-  #render raw response for Write
-  output$writeRawResponse <- renderUI({
-    result = rv$writeResult
-    if(is.null(result)){
-      return(NULL)
-    }
+  #observer for write streaming updates (polls without triggering UI rebuild)
+  observe({
+    streaming = rv$writeStreaming
+    if(streaming$active && !is.null(streaming$statusFile) && file.exists(streaming$statusFile)){
+      status = tryCatch(readLines(streaming$statusFile, warn = FALSE)[1], error = function(e) "")
+      content = tryCatch(
+        paste(readLines(streaming$outputFile, warn = FALSE), collapse = "\n"),
+        error = function(e) ""
+      )
 
-    if(result$success){
-      tags$div(
-        rclipButton(
-          "writeRawResponseClip",
-          "Copy raw response",
-          result$content,
-          icon = icon("copy")
+      if(status == "running" || status == "starting"){
+        #update content via JavaScript to preserve scroll position
+        session$sendCustomMessage("updateStreamContent", list(
+          id = "writeStreamingContent",
+          content = content
+        ))
+        invalidateLater(200)  #poll every 200ms
+      } else if(status == "success"){
+        #streaming completed successfully
+        rv$writeResult = list(success = TRUE, content = content)
+        rv$writeStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL)
+      } else if(startsWith(status, "error:")){
+        #streaming encountered an error
+        rv$writeResult = list(success = FALSE, error = substring(status, 7))
+        rv$writeStreaming = list(active = FALSE, outputFile = NULL, statusFile = NULL, process = NULL)
+      }
+    }
+  })
+
+  #render raw response UI for Write (only rebuilds when streaming state or result changes)
+  output$writeRawResponse <- renderUI({
+    streaming = rv$writeStreaming
+    result = rv$writeResult
+
+    if(streaming$active){
+      #render streaming UI once - content updated via JS observer above
+      tagList(
+        tags$div(
+          style = "padding: 10px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; margin-bottom: 10px;",
+          icon("spinner", class = "fa-spin"),
+          " Receiving response..."
         ),
-        tags$pre(style = "white-space: pre-wrap; margin-top: 10px;", result$content)
+        tags$pre(id = "writeStreamingContent", class = "streaming-output", "")
       )
-    } else {
-      tags$div(
-        style = "padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;",
-        icon("exclamation-circle"),
-        " Error: ", result$error
-      )
+    } else if(!is.null(result)){
+      #show final result
+      if(result$success){
+        tags$div(
+          rclipButton(
+            "writeRawResponseClip",
+            "Copy raw response",
+            result$content,
+            icon = icon("copy")
+          ),
+          tags$pre(class = "streaming-output", style = "margin-top: 10px;", result$content)
+        )
+      } else {
+        tags$div(
+          style = "padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;",
+          icon("exclamation-circle"),
+          " Error: ", result$error
+        )
+      }
     }
   })
 
